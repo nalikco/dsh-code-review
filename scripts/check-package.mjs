@@ -11,7 +11,7 @@ const manifest = JSON.parse(await readFile(path.join(root, 'package.json'), 'utf
 const expected = [
   'LICENSE', 'README.md', 'README.ru.md', 'SECURITY.md', 'package.json', 'cordis.patch.yml', 'icon.svg',
   'locale/en.json', 'locale/ru.json', 'index.mjs', 'engine.mjs', 'findings.mjs', 'fix.mjs', 'git.mjs',
-  'options.mjs', 'prompts.mjs', 'runner.mjs', 'workspace.mjs',
+  'options.mjs', 'prompts.mjs', 'runner.mjs', 'workspace.mjs', 'services.mjs',
 ].sort();
 assert.equal(manifest.private, true);
 assert.equal(manifest.repository.url, 'git+https://github.com/nalikco/dsh-code-review.git');

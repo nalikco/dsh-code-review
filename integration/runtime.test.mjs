@@ -4,19 +4,11 @@ import { execFileSync } from 'node:child_process';
 import os from 'node:os';
 import path from 'node:path';
 import assert from 'node:assert/strict';
-import { Context } from '@deepseek-ai/cordis';
-import SystemPrompt from '@deepseek-ai/dsh-system-prompt';
-import ToolRuntime from '@deepseek-ai/dsh-tools';
-import SessionProjectionRegistry from '@deepseek-ai/dsh-session-projection';
-import SessionStore from '@deepseek-ai/dsh-session';
-import AgentRegistry from '@deepseek-ai/dsh-agent';
 import AgentLoop from '@deepseek-ai/dsh-agent-loop';
-import LlmRuntime, { LlmAdapter } from '@deepseek-ai/dsh-llm';
-import SandboxPolicy from '@deepseek-ai/dsh-sandbox-policy';
-import Commands from '@deepseek-ai/dsh-commands';
-import LocalFs from '@deepseek-ai/dsh-fs-local';
+import { LlmAdapter } from '@deepseek-ai/dsh-llm';
 import * as plugin from '../index.mjs';
 import { runReviewer, reviewGuard } from '../runner.mjs';
+import { createHost } from './host.mjs';
 
 class ScriptedAdapter extends LlmAdapter {
   requests = []; counts = new Map(); mode = 'success';
@@ -41,10 +33,7 @@ class ScriptedAdapter extends LlmAdapter {
   }
 }
 async function setup(t, mode = 'success', withRead = false) {
-  const ctx = new Context();
-  new SystemPrompt(ctx, {}); new ToolRuntime(ctx); new SessionProjectionRegistry(ctx); new SessionStore(ctx); new AgentRegistry(ctx); new LlmRuntime(ctx);
-  new SandboxPolicy(ctx, { mode: 'workspace-write', workspaceRoot: '/tmp' });
-  new Commands(ctx); new LocalFs(ctx, { cwd: '/tmp', diffBasisMaxBytes: 100000 });
+  const ctx = await createHost(t);
   const adapter = new ScriptedAdapter(); adapter.mode = mode;
   const remove = ctx.llm.registerAdapter(['test'], adapter); t.after(remove);
   let writes = 0;
@@ -69,7 +58,7 @@ test('real loop commits structured report and disposes child', async t => {
   assert.equal(adapter.requests.length, 1);
   assert.deepEqual(adapter.requests[0].tools.map(t => t.name), ['submit_review']);
   assert.equal(ctx.agents.list().length, 1);
-  assert.equal(parent.ctx.sandboxPolicy.resolve({ session: parent.session }).mode, 'workspace-write');
+  assert.equal(parent.ctx.get('sandboxPolicy').resolve({ session: parent.session }).mode, 'workspace-write');
 });
 test('model cannot execute a denied write even when it names it directly', async t => {
   const { ctx, parent, writes } = await setup(t, 'attack');
@@ -120,6 +109,8 @@ test('actual command dispatch drives three reviewers over real repository', asyn
   await writeFile(path.join(root, 'a.js'), 'new\n');
   const handle = await ctx.agents.create({ sessionId: 'command-repo', meta: { cwd: root }, agentOptions: { provider: 'test', model: 'scripted' } }); t.after(() => handle.dispose());
   const fiber = ctx.plugin(plugin, {}); while (fiber.inertia) await fiber.inertia; t.after(() => fiber.dispose());
+  assert.throws(() => handle.agent.ctx.fs, /cannot get property "fs" without inject/);
+  assert.throws(() => handle.agent.ctx.sandboxPolicy, /without inject/);
   const execution = await ctx.commands.execute(handle.agent, '/code-review', [], new AbortController().signal);
   assert.equal(execution.result.kind, 'success', execution.result.text);
   assert.match(execution.result.text, /не найдено/);

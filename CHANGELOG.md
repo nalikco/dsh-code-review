@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.0.1
+
+- Fix `cannot get property "fs" without inject` when a command runs against an agent-loop context. Resolve active services with Cordis scoped `get()` without changing isolation, policy or lifecycle ownership.
+- Cover `sandboxPolicy`, fix scheduling and reviewer service access with the same scoped lookup.
+- Construct SDK service providers through real plugin fibers in review/fix integration tests, and exercise evidence collection from the installed packed artifact.
+
 ## 1.0.0
 
 First release prepared for public Git installation.

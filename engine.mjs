@@ -3,6 +3,7 @@ import { collectChanges } from './git.mjs';
 import { loadEvidence, assertUnchanged } from './workspace.mjs';
 import { normalizeReport, deduplicate, formatReport } from './findings.mjs';
 import { LANES, reviewPrompt, validationPrompt } from './prompts.mjs';
+import { service } from './services.mjs';
 
 export async function mapBounded(items, concurrency, fn) {
   const results = new Array(items.length); let next = 0;
@@ -27,10 +28,10 @@ export function createHandler(ctx, rawConfig, reviewer, dependencies = {}) {
     let evidence, findings = [], limitations = [], fix = null, verification = null, stale = false;
     try {
       const scope = agent.ctx;
-      const fs = scope.fs;
+      const fs = service(scope, 'fs');
       const cwd = agent.session.header.cwd;
       if (!cwd || fs.processPathFromHostPath(cwd) !== cwd) throw new Error('Версия 0.1 поддерживает только локальный host-backed Git workspace.');
-      const policy = scope.sandboxPolicy.resolve({ session: agent.session });
+      const policy = service(scope, 'sandboxPolicy').resolve({ session: agent.session });
       if (options.fix && policy.mode === 'read-only') throw new Error('--fix не может расширить read-only права сессии. Сначала явно измени режим доступа.');
       const changes = await collect(cwd, options, config, combined);
       if (!changes.files.length) return { kind: 'success', text: 'Нет Git-изменений для review. Автоматический выбор случайных недавних файлов не выполняется.' };

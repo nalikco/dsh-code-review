@@ -1,6 +1,6 @@
 {
   "name": "dsh-code-review",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "private": true,
   "description": "Read-only multi-angle code review with independently validated, policy-preserving fix handoff for DeepSeek Harness.",
   "type": "module",
@@ -22,7 +22,7 @@
   },
   "files": [
     "index.mjs", "engine.mjs", "findings.mjs", "fix.mjs", "git.mjs",
-    "options.mjs", "prompts.mjs", "runner.mjs", "workspace.mjs",
+    "options.mjs", "prompts.mjs", "runner.mjs", "workspace.mjs", "services.mjs",
     "cordis.patch.yml", "icon.svg", "locale/*.json", "README.md", "README.ru.md", "SECURITY.md", "LICENSE"
   ],
   "scripts": {

@@ -3,21 +3,14 @@ import assert from 'node:assert/strict';
 import { mkdtemp, writeFile, readFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-import { Context } from '@deepseek-ai/cordis';
-import SystemPrompt from '@deepseek-ai/dsh-system-prompt';
-import ToolRuntime from '@deepseek-ai/dsh-tools';
-import SessionProjectionRegistry from '@deepseek-ai/dsh-session-projection';
-import SessionStore from '@deepseek-ai/dsh-session';
-import AgentRegistry from '@deepseek-ai/dsh-agent';
 import AgentLoop from '@deepseek-ai/dsh-agent-loop';
-import LlmRuntime, { LlmAdapter } from '@deepseek-ai/dsh-llm';
-import SandboxPolicy from '@deepseek-ai/dsh-sandbox-policy';
-import LocalFs from '@deepseek-ai/dsh-fs-local';
+import { LlmAdapter } from '@deepseek-ai/dsh-llm';
 import * as fsTools from '@deepseek-ai/dsh-tool-fs';
 import * as observation from '@deepseek-ai/dsh-fs-observation-policy';
 import { createFixScheduler } from '../fix.mjs';
 import { loadEvidence } from '../workspace.mjs';
 import { DEFAULTS } from '../options.mjs';
+import { createHost } from './host.mjs';
 class Scripted extends LlmAdapter {
   step = 0; mode = 'normal'; started;
   async *stream(options) {
@@ -38,7 +31,7 @@ class Scripted extends LlmAdapter {
 }
 async function setup(t, mode = 'normal') {
  const root = await mkdtemp(path.join(os.tmpdir(), 'review-fix-')); await writeFile(path.join(root, 'a.js'), 'one\n');
- const ctx = new Context(); new SystemPrompt(ctx, {}); new ToolRuntime(ctx); new SessionProjectionRegistry(ctx); new SessionStore(ctx); new AgentRegistry(ctx); new LlmRuntime(ctx); new SandboxPolicy(ctx, { mode: 'workspace-write', workspaceRoot: root }); new LocalFs(ctx, { cwd: root, diffBasisMaxBytes: 100000 });
+ const ctx = await createHost(t, root);
  const toolFiber = ctx.plugin(fsTools, {}); while (toolFiber.inertia) await toolFiber.inertia; t.after(() => toolFiber.dispose());
  const observe = ctx.plugin(observation, {}); while (observe.inertia) await observe.inertia; t.after(() => observe.dispose());
  const adapter = new Scripted(); adapter.mode = mode; t.after(ctx.llm.registerAdapter(['test'], adapter));

@@ -6,6 +6,7 @@ import { defineTool } from '@deepseek-ai/dsh-tools';
 import { setSandboxMode } from '@deepseek-ai/dsh-sandbox-policy';
 import { applyChildComposition, appendDelegatedPolicyOverrides, captureDelegatedPolicyOverrides, childSessionMeta, resolveChildAgentOptions, resolveChildDepth } from '@deepseek-ai/dsh-subagent';
 import { REPORT_PARAMETERS } from './findings.mjs';
+import { service } from './services.mjs';
 
 const READ_TOOLS = ['read', 'glob', 'grep'];
 export function reviewGuard(allowed, submitted) {
@@ -23,7 +24,7 @@ export async function runReviewer(ctx, parent, prompt, signal) {
   const depth = resolveChildDepth(parent);
   const pending = new WeakMap();
   let captured, boundary, loopError;
-  const handle = await parent.ctx.agents.create({
+  const handle = await service(parent.ctx, 'agents').create({
     sessionId: SessionId(randomUUID()), parentAgent: parent,
     meta: childSessionMeta(parent, depth, false),
     agentOptions: resolveChildAgentOptions(parent, {}, depth), signal,
@@ -31,11 +32,12 @@ export async function runReviewer(ctx, parent, prompt, signal) {
       appendDelegatedPolicyOverrides(child.session, inherited);
       applyChildComposition(childCtx, parent, {});
       setSandboxMode(child.session, 'read-only');
-      childCtx.tools.presentAs('native');
-      const allowed = READ_TOOLS.filter(name => childCtx.tools.get(name, child) !== undefined);
-      childCtx.tools.restrict({ allow: allowed });
-      childCtx.tools.guard(reviewGuard(allowed, () => captured !== undefined));
-      childCtx.tools.register(defineTool({
+      const tools = service(childCtx, 'tools');
+      tools.presentAs('native');
+      const allowed = READ_TOOLS.filter(name => tools.get(name, child) !== undefined);
+      tools.restrict({ allow: allowed });
+      tools.guard(reviewGuard(allowed, () => captured !== undefined));
+      tools.register(defineTool({
         name: 'submit_review', description: 'Submit the final structured code review exactly once. This concludes the review turn.',
         parameters: REPORT_PARAMETERS,
         output: { schema: { type: 'boolean' }, render: () => [{ type: 'text', text: 'Review recorded.' }] },

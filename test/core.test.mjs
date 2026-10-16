@@ -23,7 +23,7 @@ function fixture() {
     },
   };
   const changes = { root: '/repo', files: ['a.js'], untracked: new Set(), base: 'sha', diff: '-const x = 0;\n+const x = 1;\n' };
-  const agent = { id: 'parent', status: 'idle', session: { header: { cwd: '/repo' } }, ctx: { fs, sandboxPolicy: { resolve: () => ({ mode: 'workspace-write', workspaceRoot: '/repo' }) } } };
+  const agent = { id: 'parent', status: 'idle', session: { header: { cwd: '/repo' } }, ctx: { get(name) { return this[name]; }, fs, sandboxPolicy: { resolve: () => ({ mode: 'workspace-write', workspaceRoot: '/repo' }) } } };
   return { fs, files, writes, changes, agent };
 }
 const finding = (overrides = {}) => ({ id: 'a', file: 'a.js', line: 1, category: 'bug', severity: 'medium', title: 'Incorrect x', explanation: 'x must be 2 for caller', evidence: 'caller expects 2', safeToFix: true, edits: [{ file: 'a.js', oldString: 'x = 1', newString: 'x = 2' }], ...overrides });

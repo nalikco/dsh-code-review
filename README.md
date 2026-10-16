@@ -4,7 +4,7 @@ English | [Русский](README.ru.md)
 
 A `/code-review` command for [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness), combining correctness/security, reuse/quality and efficiency review. Three read-only reviewers work in parallel, then independent validators check their findings. Source files are not modified by default.
 
-Version **1.0.0**. License: [MIT](LICENSE).
+Version **1.0.1**. License: [MIT](LICENSE).
 
 ## Requirements and installation
 

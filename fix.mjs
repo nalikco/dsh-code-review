@@ -1,6 +1,7 @@
 import path from 'node:path';
 import { createUserMessage } from '@deepseek-ai/dsh-llm';
 import { planEdits, assertUnchanged } from './workspace.mjs';
+import { service } from './services.mjs';
 
 // Fixes run in a normal parent turn. The command itself never calls fs.writeText.
 // Standard tool policies, Auto review, observations and durable tool logs remain authoritative.
@@ -11,23 +12,23 @@ export function createFixScheduler(ctx) {
     if (pending.has(agent.id)) throw new Error('В этой сессии уже ожидаются исправления.');
     const { planned, skipped } = planEdits(findings, evidence);
     if (!planned.size) return { queued: [], skipped, applied: [], error: null };
-    if (!agent.ctx.tools.get('edit', agent)) throw new Error('Для --fix нужен штатный инструмент edit в родительской сессии.');
+    if (!service(agent.ctx, 'tools').get('edit', agent)) throw new Error('Для --fix нужен штатный инструмент edit в родительской сессии.');
     const assertAllowed = () => {
       const plan = agent.ctx.get('planMode')?.get(agent);
       if (plan?.active || plan?.pending === true) throw new Error('--fix запрещён в plan mode.');
-      if (agent.ctx.sandboxPolicy.resolve({ session: agent.session }).mode === 'read-only') throw new Error('--fix запрещён в read-only.');
+      if (service(agent.ctx, 'sandboxPolicy').resolve({ session: agent.session }).mode === 'read-only') throw new Error('--fix запрещён в read-only.');
     };
     assertAllowed();
-    if (agent.ctx.tools.modeFor(agent) === 'ptc') throw new Error('--fix требует native или both tool presentation, PTC-only не поддерживается.');
+    if (service(agent.ctx, 'tools').modeFor(agent) === 'ptc') throw new Error('--fix требует native или both tool presentation, PTC-only не поддерживается.');
     await agent.whenIdle();
-    await assertUnchanged(agent.ctx.fs, evidence, config, signal);
+    await assertUnchanged(service(agent.ctx, 'fs'), evidence, config, signal);
     signal.throwIfAborted();
     if (agent.status === 'running') throw new Error('Родительский агент начал другой ход, повтори --fix после его завершения.');
     const edits = [...planned].map(([file, proposal]) => ({ file, target: proposal.target, version: proposal.version, oldString: evidence.snapshots.get(file).content, newString: proposal.content }));
     const remaining = new Map(edits.map(edit => [edit.target.targetKey, edit]));
     let close = () => {}, started = false, stopped = false;
     const release = agent.ctx.effect(() => {
-      const offGuard = agent.ctx.tools.guard(exec => {
+      const offGuard = service(agent.ctx, 'tools').guard(exec => {
         if (stopped || signal.aborted) return 'Fix turn stopped after cancellation or tool failure.';
         try { assertAllowed(); } catch (error) { return error.message; }
         if (exec.arguments?.sandbox_permissions) return 'Fix cannot escalate permissions.';

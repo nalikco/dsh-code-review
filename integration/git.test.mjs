@@ -59,7 +59,7 @@ test('symlink changed file is explicit unsupported coverage and cannot be edited
 test('full engine against real git/fs read-only and --fix', async t => {
   const { root, fs } = await repo(t); await writeFile(path.join(root, 'a.js'), 'const x = 2;\n');
   const finding = { id: 'x', file: 'a.js', line: 1, category: 'bug', severity: 'high', title: 'Fix x', explanation: 'Reachable example', evidence: 'Fixture contract', safeToFix: true, edits: [{ file: 'a.js', oldString: 'x = 2', newString: 'x = 3' }] };
-  const agent = { id: 'fixture', status: 'idle', session: { header: { cwd: root } }, ctx: { fs, sandboxPolicy: { resolve: () => ({ mode: 'workspace-write', workspaceRoot: root }) } } };
+  const agent = { id: 'fixture', status: 'idle', session: { header: { cwd: root } }, ctx: { get(name) { return this[name]; }, fs, sandboxPolicy: { resolve: () => ({ mode: 'workspace-write', workspaceRoot: root }) } } };
   let calls = 0;
   const { handler } = createHandler({}, {}, async (_c, _a, prompt) => { calls++; return { findings: prompt.includes('independent skeptical validator') || (calls - 1) % 4 === 0 ? [finding] : [], limitations: [] }; });
   const review = await handler({ agent, rawInput: '', signal }); assert.equal(review.kind, 'success'); assert.match(await readFile(path.join(root, 'a.js'), 'utf8'), /x = 2/);

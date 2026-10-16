@@ -7,7 +7,7 @@ const finding = { id: 'x', file: 'a.js', side: 'worktree', line: 1, category: 'b
 function fixture() {
   const fs = { processPathFromHostPath: x => x, resolve: async x => ({ targetKey: x, displayPath: x }), contains: (a, b) => b.displayPath.startsWith(a.displayPath + '/'), lstat: async p => p.endsWith('a.js') ? { type: 'file' } : undefined, stat: async () => ({ type: 'file', version: 1, size: 3 }), readBytes: async () => Buffer.from('one'), writeText: async () => { throw new Error('HOST WRITE FORBIDDEN'); } };
   const changes = { root: '/repo', files: ['a.js'], base: 'sha', head: 'sha', diff: 'one', untracked: new Set() };
-  const agent = { id: 'a', status: 'idle', session: { header: { cwd: '/repo' } }, ctx: { fs, sandboxPolicy: { resolve: () => ({ mode: 'workspace-write', workspaceRoot: '/repo' }) } } };
+  const agent = { id: 'a', status: 'idle', session: { header: { cwd: '/repo' } }, ctx: { get(name) { return this[name]; }, fs, sandboxPolicy: { resolve: () => ({ mode: 'workspace-write', workspaceRoot: '/repo' }) } } };
   return { fs, agent, changes };
 }
 test('Git environment strips all routing/config and index overrides', () => {
@@ -44,4 +44,10 @@ test('internal unload during review cannot return success', async () => {
  const f = fixture(); let stop;
  const instance = createHandler({}, {}, async (_c, _a, _p, signal) => { stop(); signal.throwIfAborted(); }, { collectChanges: async () => f.changes }); stop = instance.stop;
  const result = await instance.handler({ agent: f.agent, rawInput: '', signal: new AbortController().signal }); assert.equal(result.kind, 'error');
+});
+test('missing scoped service fails closed before evidence or model calls', async () => {
+ const f = fixture(); f.agent.ctx.get = () => undefined; let called = false;
+ const { handler } = createHandler({}, {}, async () => { called = true; }, { collectChanges: async () => { called = true; } });
+ const result = await handler({ agent: f.agent, rawInput: '', signal: new AbortController().signal });
+ assert.equal(result.kind, 'error'); assert.match(result.text, /requires active service "fs"/); assert.equal(called, false);
 });
