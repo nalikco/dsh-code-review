@@ -7,6 +7,7 @@
 - Keep `--fix`, `--base`, `--focus` and `--help`; normal DSH tools, model, permissions and cancellation own execution.
 - Default no-edit behavior is now a prompt instruction, not an extra enforced sandbox. No plugin configuration is needed; old engine limits are unused.
 - Preserve Git history for rollback; no live profile changes are performed by this rewrite.
+- Preserve literal regex/path backslashes in quoted focus values and cover command abort, unsupported attachments, retained queued work and existing parent tool policies.
 
 ## 1.0.2 (unpublished engine experiment)
 

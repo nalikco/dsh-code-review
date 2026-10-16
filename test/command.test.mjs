@@ -17,6 +17,23 @@ for (const [input, expected] of [
   ["--focus 'a b' --help", { fix: false, base: null, focus: 'a b', help: true }],
 ]) test(`parse ${input || 'default'}`, () => assert.deepEqual(parseOptions(input), expected));
 for (const input of ['--fix --fix', '--unknown', '--base', '--base -x', '--focus "x', '--base "a\nb"', '--focus \\']) test(`reject ${JSON.stringify(input)}`, () => assert.throws(() => parseOptions(input)));
+test('quoted and unquoted focus preserve literal regex/path backslashes', () => {
+  const value = String.raw`regex \d+ and C:\temp`;
+  assert.equal(parseOptions(`--focus "${value}"`).focus, value);
+  assert.equal(parseOptions(`--focus '${value}'`).focus, value);
+  assert.equal(parseOptions(String.raw`--focus \d+`).focus, String.raw`\d+`);
+});
+test('escapes handle quotes, spaces and doubled backslashes without shell expansion', () => {
+  assert.equal(parseOptions(String.raw`--focus "a \"quote\" and \\ slash"`).focus, 'a "quote" and \\ slash');
+  assert.equal(parseOptions(String.raw`--focus a\ b`).focus, 'a b');
+  assert.equal(parseOptions('--focus "$(echo test)"').focus, '$(echo test)');
+});
+test('explicitly quoted focus may start with flags, missing bare values still fail', () => {
+  assert.equal(parseOptions('--focus "--fix behavior"').focus, '--fix behavior');
+  assert.equal(parseOptions("--focus '--help'").focus, '--help');
+  assert.throws(() => parseOptions('--focus --fix'), /Некорректное значение/);
+  assert.throws(() => parseOptions('--base "--help"'), /git ref/);
+});
 test('plugin only depends on command registration', () => {
   const f = fixture(); assert.deepEqual(inject, ['commands']); assert.equal(f.definition.name, 'code-review');
 });

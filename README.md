@@ -26,6 +26,8 @@ The plugin registers the command, parses its arguments and submits [REVIEW_PROMP
 | `--focus "text"` | Additional topic; quote values containing spaces. |
 | `--help` | Show help without waking the agent. |
 
+Quotes group values without shell expansion. Literal backslashes in regexes/paths are preserved; use `\"` inside a double-quoted value for a quote and `\\` for an escaped backslash. Quote a flag-leading topic explicitly, for example `--focus "--fix behavior"`. Composer attachments are not accepted by this command.
+
 Command success means **queued**, not that review finished. If the agent is busy, review follows its current turn. After handoff use ordinary DSH turn/queue controls to stop the work. Unloading this plugin removes the slash command but does not cancel tasks the agent already accepted.
 
 ## Deliberately small
