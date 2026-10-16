@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.1.1
+## 1.0.0
 
 First release prepared for public Git installation.
 
@@ -12,6 +12,6 @@ First release prepared for public Git installation.
 - Harden Git collection against configured helpers, nested submodule filters and inherited configuration overrides.
 - Support unborn/orphan branches, severity-preserving deduplication and per-finding validation failures.
 
-## 0.1.0 (unpublished development prototype)
+## Unpublished development prototypes (0.1.x)
 
-Not recommended. The prototype's host-side fix path bypassed parent tool policies and could lose partial-apply reporting on cancellation. Use 0.1.1 or newer.
+These builds were never public releases. The early host-side fix path bypassed parent tool policies and could lose partial-apply reporting on cancellation; it was replaced before 1.0.0. Use the initial public release 1.0.0 or newer.

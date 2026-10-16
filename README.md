@@ -4,7 +4,7 @@ English | [Русский](README.ru.md)
 
 A `/code-review` command for [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness), combining correctness/security, reuse/quality and efficiency review. Three read-only reviewers work in parallel, then independent validators check their findings. Source files are not modified by default.
 
-Version **0.1.1**. License: [MIT](LICENSE).
+Version **1.0.0**. License: [MIT](LICENSE).
 
 ## Requirements and installation
 
@@ -64,7 +64,7 @@ A successful slash command means the proposals were **queued**, not that edits c
 - Auto may refuse a fix requiring additional human authority. Machine-generated replacement data is not disguised as a new authenticated human instruction.
 - **Do not edit the worktree concurrently with `--fix`.** SDK version checks are not atomic compare-and-swap against an external editor: a window remains between version probe and atomic rename. There is no multi-file transaction or automatic rollback. LLM validation does not guarantee a correct patch.
 
-The unpublished 0.1.0 development prototype used direct host writes and is not recommended. Use 0.1.1 or newer; see [CHANGELOG.md](CHANGELOG.md).
+Version 1.0.0 is the initial public release. Earlier 0.1.x builds were unpublished development prototypes; see [CHANGELOG.md](CHANGELOG.md).
 
 ## Data and security
 
