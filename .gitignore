@@ -1,0 +1,19 @@
+# Dependencies and generated release output
+node_modules/
+*.tgz
+coverage/
+*.log
+.DS_Store
+/.package-temp-alias
+
+# Local audit material and machine-specific verification
+/VERIFICATION.md
+/.dsh-sdk/
+/.local/
+/research/
+
+# Credentials and private configuration
+.env
+.env.*
+*.pem
+*.key

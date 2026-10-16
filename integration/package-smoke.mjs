@@ -1,0 +1,25 @@
+// Run from an extracted package with SDK node_modules in the parent directory.
+import assert from 'node:assert/strict';
+import { Context } from '@deepseek-ai/cordis';
+import SystemPrompt from '@deepseek-ai/dsh-system-prompt';
+import ToolRuntime from '@deepseek-ai/dsh-tools';
+import SessionProjectionRegistry from '@deepseek-ai/dsh-session-projection';
+import SessionStore from '@deepseek-ai/dsh-session';
+import AgentRegistry from '@deepseek-ai/dsh-agent';
+import AgentLoop from '@deepseek-ai/dsh-agent-loop';
+import LlmRuntime from '@deepseek-ai/dsh-llm';
+import SandboxPolicy from '@deepseek-ai/dsh-sandbox-policy';
+import Commands from '@deepseek-ai/dsh-commands';
+import LocalFs from '@deepseek-ai/dsh-fs-local';
+const plugin = await import(process.env.PACKAGE_ENTRY);
+const ctx = new Context();
+new SystemPrompt(ctx, {}); new ToolRuntime(ctx); new SessionProjectionRegistry(ctx); new SessionStore(ctx); new AgentRegistry(ctx); new LlmRuntime(ctx);
+new SandboxPolicy(ctx, { mode: 'read-only', workspaceRoot: '/tmp' }); new Commands(ctx); new LocalFs(ctx, { cwd: '/tmp', diffBasisMaxBytes: 100000 });
+const loop = ctx.plugin(AgentLoop, { agents: [], maxParallelToolCalls: 3 }); while (loop.inertia) await loop.inertia; assert.equal(loop.state, 2);
+const fiber = ctx.plugin(plugin, {}); while (fiber.inertia) await fiber.inertia; assert.equal(fiber.state, 2);
+const handle = await ctx.agents.create({ sessionId: 'packed-smoke', meta: { cwd: '/tmp' }, agentOptions: { provider: 'fixture', model: 'unused' } });
+const execution = await ctx.commands.execute(handle.agent, '/code-review --help', [], new AbortController().signal);
+assert.equal(execution.result.kind, 'success'); assert.match(execution.result.text, /--fix/);
+await fiber.dispose(); assert.equal(ctx.commands.find(handle.agent, 'code-review'), undefined);
+await handle.dispose(); await loop.dispose();
+console.log('Packed bundle: activate, command help, unload OK');
