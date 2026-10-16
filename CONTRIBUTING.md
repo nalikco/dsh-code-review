@@ -8,7 +8,7 @@ npm run test:all
 npm run test:package
 ```
 
-The implementation is intentionally small: `index.mjs` registers and queues the command, `options.mjs` parses arguments, `prompt.mjs` loads and combines the readable `REVIEW_PROMPT.md` with the selected mode. Do not rebuild a separate Git/review/fix orchestration engine here.
+The implementation is intentionally small: `index.mjs` registers the command and native skill, `options.mjs` parses arguments, `prompt.mjs` loads the readable `REVIEW_PROMPT.md` as skill content and formats a short invocation with mode/base/focus. Native `dsh-tool-skill` loads instructions at pre-step; never paste them back into the human message. Parameter slashes must stay escaped in JSON because the native gesture scanner examines every text block. Do not rebuild a separate Git/review/fix orchestration engine here.
 
 Unit tests use normal message creation and a stub current agent. Integration tests mount real Cordis/DSH service fibers and use a scripted model adapter to verify prompt delivery, help, busy-agent queueing and unload. The package check installs a real tarball in a fresh consumer and verifies registration/handoff. No test mutates a DSH profile or calls a live model. CI declares Linux/macOS × Node22/24; local passes do not imply hosted CI has passed.
 

@@ -2,14 +2,14 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { apply, inject } from '../index.mjs';
 import { parseOptions, HELP } from '../options.mjs';
-import { buildPrompt } from '../prompt.mjs';
+import { buildInvocation, skill, SKILL_NAME } from '../prompt.mjs';
 
 function fixture() {
-  let definition; const messages = [];
-  apply({ commands: { register(value) { definition = value; } } });
+  let definition; const messages = [], registered = [];
+  apply({ commands: { register(value) { definition = value; } }, skills: { register(value) { registered.push(value); } } });
   const agent = { followup(message) { messages.push(message); } };
   const invoke = (rawInput = '', signal = new AbortController().signal) => definition.handler({ agent, rawInput, signal });
-  return { definition, messages, invoke };
+  return { definition, messages, invoke, registered };
 }
 for (const [input, expected] of [
   ['', { fix: false, base: null, focus: '', help: false }],
@@ -34,20 +34,22 @@ test('explicitly quoted focus may start with flags, missing bare values still fa
   assert.throws(() => parseOptions('--focus --fix'), /Некорректное значение/);
   assert.throws(() => parseOptions('--base "--help"'), /git ref/);
 });
-test('plugin only depends on command registration', () => {
-  const f = fixture(); assert.deepEqual(inject, ['commands']); assert.equal(f.definition.name, 'code-review');
+test('plugin registers command and explicit-only native skill', () => {
+  const f = fixture(); assert.deepEqual(inject, ['commands', 'skills']); assert.equal(f.definition.name, 'code-review');
+  assert.deepEqual(f.registered, [skill]); assert.equal(skill.name, SKILL_NAME); assert.deepEqual(skill.invocation, { userInvocable: true, modelInvocable: false });
 });
-test('default queues one readable analysis prompt on current agent', () => {
+test('default queues short skill invocation, never the full instructions', () => {
   const f = fixture(), result = f.invoke(); assert.equal(result.kind, 'success'); assert.equal(f.messages.length, 1);
   const message = f.messages[0], text = message.content[0].text;
-  assert.equal(message.role, 'user'); assert.match(text, /ANALYSIS ONLY/); assert.match(text, /Correctness and security/); assert.match(text, /Reuse and code quality/); assert.match(text, /Efficiency/);
-  assert.match(text, /three independent read-only reviews in parallel/); assert.match(text, /If delegation is unavailable or disallowed/);
+  assert.equal(message.role, 'user'); assert.match(text, /^\/dsh-code-review\n/); assert.match(text, /ANALYSIS ONLY/);
+  assert.doesNotMatch(text, /Correctness and security|Reuse and code quality/); assert.ok(text.length < 500);
+  assert.match(skill.content, /three independent read-only reviews in parallel/); assert.match(skill.content, /If delegation is unavailable or disallowed/);
 });
 test('fix is explicit and parameters remain literal prompt data', () => {
   const f = fixture(); f.invoke('--fix --base "main; echo unsafe" --focus "timeout handling"');
   const text = f.messages[0].content[0].text;
   assert.match(text, /Mode: FIX/); assert.match(text, /Base ref \(JSON string\): "main; echo unsafe"/); assert.match(text, /timeout handling/);
-  assert.match(text, /not authorization for commit, push/);
+  assert.match(skill.content, /not authorization for commit, push/);
 });
 test('help and invalid input do not wake model', () => {
   const f = fixture(); assert.equal(f.invoke('--help').text, HELP); assert.equal(f.invoke('--typo').kind, 'error'); assert.equal(f.messages.length, 0);
@@ -57,7 +59,15 @@ test('aborted invocation does not enqueue anything', () => {
   assert.throws(() => f.invoke('', controller.signal), /cancelled/); assert.equal(f.messages.length, 0);
 });
 test('review prompt does not require engine JSON output or hardcoded providers', () => {
-  const text = buildPrompt(parseOptions(''));
+  const text = skill.content;
   assert.doesNotMatch(text, /submit_review|structured_output|claude-opus|maxDiffBytes/);
   assert.match(text, /Respond in the user's language/);
+});
+test('parameter slashes cannot accidentally invoke other native skills', () => {
+  const focus = 'check /other-skill and /etc/config', base = 'feature/topic';
+  const text = buildInvocation({ fix: false, focus, base });
+  const gestures = [...text.matchAll(/(^|\s)\/([a-z0-9]+(?:-[a-z0-9]+)*)(?=\s|$)/g)].map(m => m[2]);
+  assert.deepEqual(gestures, [SKILL_NAME]);
+  assert.equal(JSON.parse(text.split('Additional focus (JSON string): ')[1].trim()), focus);
+  assert.equal(JSON.parse(text.split('Base ref (JSON string): ')[1].split('\n')[0]), base);
 });

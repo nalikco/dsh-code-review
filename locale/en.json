@@ -1,1 +1,1 @@
-{"meta":{"title":"Code Review","description":"A review prompt for the current agent: correctness, reuse and efficiency, with optional --fix."}}
+{"meta":{"title":"Code Review","description":"Native review skill with a short invocation: correctness, reuse and efficiency; optional --fix."}}

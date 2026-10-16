@@ -10,6 +10,9 @@ import AgentRegistry from '@deepseek-ai/dsh-agent';
 import AgentLoop from '@deepseek-ai/dsh-agent-loop';
 import LlmRuntime, { LlmAdapter, createUserMessage } from '@deepseek-ai/dsh-llm';
 import * as plugin from '../index.mjs';
+import Skills from '@deepseek-ai/dsh-skill';
+import * as toolSkill from '@deepseek-ai/dsh-tool-skill';
+import { SKILL_NAME, skill } from '../prompt.mjs';
 
 async function mount(ctx, t, plugin, config = {}) {
   const fiber = ctx.plugin(plugin, config); while (fiber.inertia) await fiber.inertia;
@@ -29,15 +32,16 @@ class ScriptedAdapter extends LlmAdapter {
 }
 async function host(t) {
   const ctx = new Context();
-  for (const service of [Commands, SystemPrompt, ToolRuntime, SessionProjectionRegistry, SessionStore, AgentRegistry, LlmRuntime]) await mount(ctx, t, service);
+  for (const service of [Commands, SystemPrompt, ToolRuntime, SessionProjectionRegistry, SessionStore, AgentRegistry, LlmRuntime, Skills]) await mount(ctx, t, service);
+  await mount(ctx, t, toolSkill);
   const adapter = new ScriptedAdapter(); t.after(ctx.llm.registerAdapter(['test'], adapter));
   await mount(ctx, t, AgentLoop, { agents: [], maxParallelToolCalls: 3 });
   const handle = await ctx.agents.create({ sessionId: 'review-parent', agentOptions: { provider: 'test', model: 'scripted' } }); t.after(() => handle.dispose());
   const fiber = await mount(ctx, t, plugin);
   return { ctx, adapter, agent: handle.agent, fiber };
 }
-test('command activates with only commands service and no filesystem/policy', async t => {
-  const ctx = new Context(); await mount(ctx, t, Commands); const fiber = await mount(ctx, t, plugin);
+test('command registers skill with no filesystem or custom review engine', async t => {
+  const ctx = new Context(); await mount(ctx, t, Commands); await mount(ctx, t, Skills); const fiber = await mount(ctx, t, plugin);
   const queued = []; const agent = { followup: message => queued.push(message) };
   const definition = ctx.commands.find(agent, 'code-review'); assert.ok(definition);
   assert.equal(definition.handler({ agent, rawInput: '--fix', signal: new AbortController().signal }).kind, 'success');
@@ -51,7 +55,12 @@ test('actual slash command delivers prompt into existing normal model turn', asy
   const text = f.adapter.requests[0].messages.flatMap(m => m.content ?? []).filter(b => b.type === 'text').map(b => b.text).join('\n');
   assert.match(text, /ANALYSIS ONLY/); assert.match(text, /Base ref \(JSON string\): "main"/);
   assert.equal(f.ctx.agents.list().length, 1, 'plugin itself must not create child agents');
-  assert.ok(f.agent.session.snapshotEvents().some(event => event.type === 'user/message' && event.data.content.some(b => b.type === 'text' && b.text.includes('Code Review: correctness'))));
+  const messages = f.agent.session.snapshotEvents().filter(event => event.type === 'user/message').map(event => event.data);
+  const human = messages.filter(message => message.source.kind === 'user');
+  const loaded = messages.filter(message => message.source.kind === 'skill-invocation');
+  assert.equal(human.length, 1); assert.doesNotMatch(human[0].content[0].text, /Code Review: correctness/);
+  assert.equal(loaded.length, 1); assert.deepEqual(loaded[0].source, { kind: 'skill-invocation', name: SKILL_NAME, form: 'instructions' });
+  assert.match(loaded[0].content[0].text, /<skill_content/); assert.match(loaded[0].content[0].text, /Code Review: correctness/);
 });
 test('help does not model-call and unload removes slash registration', async t => {
   const f = await host(t);
@@ -62,7 +71,8 @@ test('help does not model-call and unload removes slash registration', async t =
 test('busy parent receives review in a distinct next turn without interrupt', async t => {
   const f = await host(t), started = Promise.withResolvers(), release = Promise.withResolvers();
   f.adapter.beforeResponse = async (request, count) => { if (count === 1) { started.resolve(request); await release.promise; } };
-  f.agent.followup(createUserMessage({ content: [{ type: 'text', text: 'Existing task' }] }));
+  t.after(() => release.resolve());
+  f.agent.followup(createUserMessage({ content: [{ type: 'text', text: 'Existing task' }], source: { kind: 'user' } }));
   const current = await started.promise;
   const result = await f.ctx.commands.execute(f.agent, '/code-review --fix', [], new AbortController().signal);
   assert.equal(result.result.kind, 'success'); assert.equal(current.signal.aborted, false); assert.equal(f.adapter.requests.length, 1);
@@ -83,14 +93,19 @@ test('invalid input and unsupported attachment do not start an agent turn', asyn
   const result = await f.ctx.commands.execute(f.agent, '/code-review', [{ type: 'image', data: 'invalid', mimeType: 'image/png' }], signal);
   assert.equal(result.result.kind, 'error'); assert.match(result.result.text, /does not accept attachments/); assert.equal(f.adapter.requests.length, 0);
 });
-test('unloading slash command preserves accepted review and other queued work', async t => {
-  const f = await host(t);
-  f.agent.followup(createUserMessage({ content: [{ type: 'text', text: 'Existing task' }] }));
+test('unload before queued skill lookup preserves queue but makes skill unavailable', async t => {
+  const f = await host(t), started = Promise.withResolvers(), release = Promise.withResolvers();
+  f.adapter.beforeResponse = async (_request, count) => { if (count === 1) { started.resolve(); await release.promise; } };
+  t.after(() => release.resolve());
+  f.agent.followup(createUserMessage({ content: [{ type: 'text', text: 'Existing task' }], source: { kind: 'user' } })); await started.promise;
   await f.ctx.commands.execute(f.agent, '/code-review', [], new AbortController().signal);
-  f.agent.followup(createUserMessage({ content: [{ type: 'text', text: 'Other queued task' }] }));
-  await f.fiber.dispose(); await f.agent.whenIdle();
-  assert.equal(f.ctx.commands.find(f.agent, 'code-review'), undefined); assert.equal(f.adapter.requests.length, 3);
-  assert.equal(f.agent.session.snapshotEvents().filter(e => e.type === 'turn/end').length, 3);
+  f.agent.followup(createUserMessage({ content: [{ type: 'text', text: 'Other queued task' }], source: { kind: 'user' } }));
+  await f.fiber.dispose(); release.resolve(); await f.agent.whenIdle();
+  assert.equal(f.ctx.commands.find(f.agent, 'code-review'), undefined); assert.equal(await f.ctx.skills.get(SKILL_NAME), undefined); assert.equal(f.adapter.requests.length, 3);
+  const events = f.agent.session.snapshotEvents(); assert.equal(events.filter(e => e.type === 'turn/end').length, 3);
+  assert.equal(events.filter(e => e.type === 'user/message' && e.data.source.kind === 'skill-invocation').length, 0);
+  const text = f.adapter.requests[1].messages.flatMap(m => m.content ?? []).filter(b => b.type === 'text').map(b => b.text).join('\n');
+  assert.match(text, /if they are missing, stop/);
 });
 test('normal parent tool deny remains authoritative after prompt handoff', async t => {
   const f = await host(t); let executed = false;
@@ -106,4 +121,21 @@ test('real command preserves quoted regex and flag-leading focus in delivered pr
   assert.equal(result.result.kind, 'success'); await f.agent.whenIdle();
   const text = f.adapter.requests[0].messages.flatMap(m => m.content ?? []).filter(b => b.type === 'text').map(b => b.text).join('\n');
   assert.ok(text.includes(`Additional focus (JSON string): ${JSON.stringify(focus)}`)); assert.match(text, /ANALYSIS ONLY/);
+});
+test('focus slash tokens do not load unrelated skills', async t => {
+  const f = await host(t);
+  f.ctx.skills.register({ name: 'other-skill', description: 'fixture', content: 'UNRELATED INSTRUCTIONS', source: 'fixture', invocation: { userInvocable: true, modelInvocable: false } });
+  await f.ctx.commands.execute(f.agent, '/code-review --focus "check /other-skill and /etc/config"', [], new AbortController().signal); await f.agent.whenIdle();
+  const injections = f.agent.session.snapshotEvents().filter(e => e.type === 'user/message' && e.data.source.kind === 'skill-invocation');
+  assert.deepEqual(injections.map(e => e.data.source.name), [SKILL_NAME]);
+});
+test('each queued review loads skill with its own mode, without custom run state', async t => {
+  const f = await host(t);
+  await f.ctx.commands.execute(f.agent, '/code-review --focus "first"', [], new AbortController().signal);
+  await f.ctx.commands.execute(f.agent, '/code-review --fix --focus "second"', [], new AbortController().signal);
+  await f.agent.whenIdle(); assert.equal(f.adapter.requests.length, 2);
+  const messages = f.agent.session.snapshotEvents().filter(e => e.type === 'user/message').map(e => e.data);
+  assert.equal(messages.filter(m => m.source.kind === 'skill-invocation').length, 2);
+  const requests = messages.filter(m => m.source.kind === 'user').map(m => m.content[0].text);
+  assert.match(requests[0], /ANALYSIS ONLY/); assert.match(requests[0], /first/); assert.match(requests[1], /Mode: FIX/); assert.match(requests[1], /second/);
 });

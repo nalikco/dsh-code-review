@@ -2,7 +2,7 @@
 
 English | [Русский](README.ru.md)
 
-Version **1.1.0**, [MIT](LICENSE). A thin `/code-review` command for [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness). It queues a readable review prompt on the current agent, combining correctness/security, reuse/quality and efficiency.
+Version **1.2.0**, [MIT](LICENSE). A small `/code-review` command backed by a **native DSH skill**, combining correctness/security, reuse/quality and efficiency.
 
 ```text
 /code-review
@@ -12,47 +12,47 @@ Version **1.1.0**, [MIT](LICENSE). A thin `/code-review` command for [DeepSeek H
 /code-review --help
 ```
 
-## How it works
+## Native skill, not a pasted user prompt
 
-The plugin registers the command, parses its arguments and submits [REVIEW_PROMPT.md](REVIEW_PROMPT.md) through the current agent's normal `followup` queue. The agent does the work with ordinary DSH tools: inspect Git diffs and project instructions, run three review directions using available subagents, validate findings and report the result. If delegation is unavailable, the prompt asks the agent to perform the three passes itself and disclose that limitation.
+The plugin registers [REVIEW_PROMPT.md](REVIEW_PROMPT.md) as the explicit-only `dsh-code-review` skill. The command queues a **short** user invocation with mode/base/focus. The standard `dsh-tool-skill` adapter recognizes `/dsh-code-review` and injects the full instructions with `source.kind: skill-invocation`, not as text attributed to the user.
 
-**Analysis-only is a prompt instruction, not a hard read-only sandbox.** With `--fix`, the prompt asks for confirmed fixes and useful local simplifications, an inspection of the final diff and relevant available checks. It does not authorize commit, push, deploy or publishing GitHub comments. DSH owns normal tools, model selection, permissions, approvals, plan mode, cancellation and subagents; the plugin does not implement another policy layer.
+The model still receives the instructions as user-role skill context. The current DSH Chat handles this as native skill context rather than a long human bubble; exact presentation depends on the DSH version. The plugin adds no custom UI renderer. It does not move the rules into a persistent system prompt or add another review engine.
+
+The agent uses normal DSH tools to inspect diffs and project instructions, run three review directions through available subagents, validate findings and report. If delegation is unavailable, the skill asks for three passes in the current agent with the limitation disclosed. The skill is user-invocable but not automatically model-invocable, so merely installing it does not start reviews.
+
+**Analysis-only is a prompt instruction, not a hard read-only sandbox.** `--fix` asks for confirmed fixes/local simplifications, final-diff inspection and relevant available checks. No commit, push, deploy or public comments are authorized. DSH owns model, tools, permissions, approvals, plan mode, cancellation and subagents.
 
 | Option | Meaning |
 | --- | --- |
-| Default | Ask for review only, without source-file edits; staged/unstaged separately plus relevant untracked source files. |
-| `--fix` | Ask the current agent to apply confirmed fixes through ordinary session tools after review. |
-| `--base <ref>` | Review relative to the merge-base of this ref and HEAD, including working-tree changes. |
-| `--focus "text"` | Additional topic; quote values containing spaces. |
-| `--help` | Show help without waking the agent. |
+| Default | Review without source edits; staged/unstaged separately plus relevant untracked source files. |
+| `--fix` | Ask for confirmed fixes through ordinary session tools after review. |
+| `--base <ref>` | Review relative to merge-base of ref/HEAD, including working-tree changes. |
+| `--focus "text"` | Additional topic; quote values containing spaces or starting with flags. |
+| `--help` | Help without waking the agent. |
 
-Quotes group values without shell expansion. Literal backslashes in regexes/paths are preserved; use `\"` inside a double-quoted value for a quote and `\\` for an escaped backslash. Quote a flag-leading topic explicitly, for example `--focus "--fix behavior"`. Composer attachments are not accepted by this command.
+Quotes group values without shell expansion. Regex/path backslashes are preserved; `\"` and `\\` escape quotes/backslashes inside double quotes. Parameters use JSON; slashes are escaped as `\u002f` so focus text cannot accidentally invoke another skill. Composer attachments are not accepted.
 
-Command success means **queued**, not that review finished. If the agent is busy, review follows its current turn. After handoff use ordinary DSH turn/queue controls to stop the work. Unloading this plugin removes the slash command but does not cancel tasks the agent already accepted.
-
-## Deliberately small
-
-No custom Git collector, duplicated base/index/worktree snapshots, 500 KB diff limit, batching engine, finding JSON protocol, provider routing, child-agent lifecycle management, extra tool guards or fix scheduler. The agent chooses context and reads within normal DSH/model limits. The old maxFiles/maxDiffBytes/maxFileBytes/maxReviewBatches/maxFindings/maxValidations/timeoutMs settings no longer apply.
-
-This is intentional: like a normal prompt command, finding validation and analysis-only behavior depend on the model. Do not treat the prompt as a security boundary or proof of correctness.
+Command success means **queued**, not finished or even loaded yet. A busy agent finishes its current turn first. Use ordinary DSH queue/turn controls after handoff. **Keep the plugin enabled until skill loading occurs.** Disabling it removes the command and skill, but not accepted queue messages; a queued invocation then lacks its instructions and asks the agent to stop/report that limitation. Already injected instructions remain in session history.
 
 ## Installation
 
-In DSH **Plugins → bundle installation**, enter:
+In DSH **Plugins → bundle installation**:
 
 ```text
 https://github.com/nalikco/dsh-code-review.git
 ```
 
-Pin a reviewed commit with `https://github.com/nalikco/dsh-code-review.git#<commit-sha>` or install the absolute path of a local clone. Do not register another global `code-review` command in the same layer. Inspect the installation result: `restart-required` means a restart is needed.
+Pin a reviewed commit using `#<commit-sha>` or install a local clone by absolute path. Inspect installation status; `restart-required` requires restart. Publishing Git changes does not update an installed profile automatically.
 
-Requires Node.js22+, DSH service packages0.2.0-rc.2 and Cordis~4.0.4. The only injected service is `commands`; message creation uses the normal LLM SDK. No build/install scripts. `private:true` prevents accidental npm publication while Git/local installation remains supported. Publishing Git changes does not update a running profile automatically.
+Requires Node22+, DSH0.2.0-rc.2/Cordis~4.0.4, services `commands` and `skills`, and an **active native `dsh-tool-skill` adapter in the agent composition**. Installing an npm peer package alone does not activate that adapter. If skills are disabled in your preset, enable the shipped skill capability there before using this command.
 
-No plugin configuration is needed. Disable/remove the bundle in Plugin Manager to uninstall.
+Do not register another global `code-review` command or any project/user/preset skill named `dsh-code-review`: normal registry precedence can override the bundled skill. No plugin settings/build/install scripts. `private:true` prevents accidental npm publication, not Git/local installation. Uninstall through Plugin Manager.
 
-## Data and trust
+## Deliberately small
 
-The agent may read source code and send it to the configured LLM provider; DSH may persist messages and tool results. Do not review private code or secrets without authorization. This plugin adds no provider or telemetry endpoint and does not execute shell/Git itself. See [SECURITY.md](SECURITY.md).
+No custom Git collector, duplicated snapshots, diff-size limit/batching, finding JSON protocol, provider routing, child lifecycle management, guards or fix scheduler. The agent chooses context under ordinary DSH/model limits. Old engine settings are unused. Like an ordinary skill, validation and analysis-only behavior depend on the model, not plugin enforcement.
+
+Source and tool results may reach the configured LLM provider and persist in DSH storage. Use authorized data only. No telemetry endpoint or separate provider. See [SECURITY.md](SECURITY.md).
 
 ## Development
 
@@ -62,6 +62,6 @@ npm run test:all
 npm run test:package
 ```
 
-Tests cover arguments, prompt content, registration/unload, normal-agent handoff/queue semantics on real DSH SDK services, and the packed artifact. Scripted adapters do not establish live-model review quality. See [CONTRIBUTING.md](CONTRIBUTING.md) and [CHANGELOG.md](CHANGELOG.md).
+Tests verify short user invocation versus full `skill-invocation` instructions, native gesture loading, argument preservation, busy queue/cancellation/unload and the packed artifact. Scripted adapters do not establish live-model accuracy or live GUI rendering. See [CONTRIBUTING.md](CONTRIBUTING.md), [CHANGELOG.md](CHANGELOG.md).
 
-Inspired by the [official code-review plugin](https://github.com/anthropics/claude-code/blob/main/plugins/code-review/commands/code-review.md) and a [published Simplify prompt](https://github.com/dsdanielpark/claude-code-system-prompts/blob/main/system-prompts/skill-simplify.md). Independent implementation, not affiliated with Anthropic.
+Inspired by the [official code-review plugin](https://github.com/anthropics/claude-code/blob/main/plugins/code-review/commands/code-review.md) and [published Simplify prompt](https://github.com/dsdanielpark/claude-code-system-prompts/blob/main/system-prompts/skill-simplify.md). Independent implementation, not affiliated with Anthropic.

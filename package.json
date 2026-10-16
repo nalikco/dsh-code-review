@@ -1,8 +1,8 @@
 {
   "name": "dsh-code-review",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "private": true,
-  "description": "A simple code-review prompt command for DeepSeek Harness, with optional fixes by the current agent.",
+  "description": "A native code-review skill for DeepSeek Harness with a short slash invocation and optional fixes.",
   "type": "module",
   "license": "MIT",
   "author": "Igor Karpliuk",
@@ -31,7 +31,9 @@
   "peerDependencies": {
     "@deepseek-ai/cordis": "~4.0.4",
     "@deepseek-ai/dsh-commands": "0.2.0-rc.2",
-    "@deepseek-ai/dsh-llm": "0.2.0-rc.2"
+    "@deepseek-ai/dsh-llm": "0.2.0-rc.2",
+    "@deepseek-ai/dsh-skill": "0.2.0-rc.2",
+    "@deepseek-ai/dsh-tool-skill": "0.2.0-rc.2"
   },
   "devDependencies": {
     "@deepseek-ai/dsh-agent": "0.2.0-rc.2",

@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.2.0
+
+- Register the review instructions as an explicit-only native `dsh-code-review` skill.
+- Queue a short invocation with mode/base/focus instead of a full human-attributed prompt. The normal DSH skill adapter injects the instructions with `skill-invocation` provenance.
+- Preserve flags and ordinary agent execution without restoring a custom review engine.
+- Escape parameter slashes to avoid accidental invocation of unrelated skills. Require the native skill registry and skill adapter; avoid conflicting skills of the same name.
+
 ## 1.1.0
 
 - Replace the custom review engine with a thin command that queues a readable combined review/simplify prompt on the current agent.
