@@ -11,7 +11,7 @@ function execGit(cwd, args, signal, maxBuffer) {
   return new Promise((resolve, reject) => execFile('git', ['--no-pager', '-c', 'core.fsmonitor=false', '-c', 'core.quotePath=false', '-c', 'core.hooksPath=/dev/null', '-c', 'diff.submodule=short', '-c', 'submodule.recurse=false', ...args], {
     cwd, signal, timeout: 30000, maxBuffer, encoding: 'utf8', windowsHide: true,
     env: gitEnvironment(),
-  }, (error, stdout, stderr) => error ? reject(new Error(`git ${args[0]} failed: ${stderr?.trim() || error.message}`)) : resolve(stdout)));
+  }, (error, stdout, stderr) => error ? reject(Object.assign(new Error(`git ${args[0]} failed: ${stderr?.trim() || error.message}`), { code: error.code })) : resolve(stdout)));
 }
 
 export async function git(cwd, args, signal, maxBuffer = 2000000) {
@@ -52,24 +52,28 @@ export async function collectChanges(cwd, options, config, signal, runGit = git)
   const diffFlags = ['--no-ext-diff', '--no-textconv', '--no-renames'];
   const stagedNames = (await runGit(root, ['diff', '--cached', '--name-only', '-z', ...diffFlags, ...base ? [base] : [], '--'], signal)).split('\0').filter(Boolean);
   const workingNames = (await runGit(root, ['diff', '--name-only', '-z', ...diffFlags, '--'], signal)).split('\0').filter(Boolean);
-  const staged = await runGit(root, ['diff', '--cached', ...diffFlags, '--unified=5', ...base ? [base] : [], '--'], signal, config.maxDiffBytes);
-  const working = await runGit(root, ['diff', ...diffFlags, '--unified=5', '--'], signal, config.maxDiffBytes);
   const names = [...new Set([...stagedNames, ...workingNames])];
-  const diff = `${staged ? `STAGED: base to index (may differ from current worktree)\n${staged}` : ''}${working ? `\nUNSTAGED: index to current worktree\n${working}` : ''}`;
-  if (Buffer.byteLength(diff) > config.maxDiffBytes) throw new Error('Git diff exceeds configured size limit.');
   const untracked = (await runGit(root, ['ls-files', '--others', '--exclude-standard', '-z'], signal)).split('\0').filter(Boolean);
   const files = [...new Set([...names, ...untracked])].map(safeRelative).sort();
   if (files.length > config.maxFiles) throw new Error(`Изменено ${files.length} файлов, лимит ${config.maxFiles}. Сузь изменения перед review.`);
-  const revisions = new Map();
+  const revisions = new Map(), fileDiffs = new Map();
+  const stagedSet = new Set(stagedNames), workingSet = new Set(workingNames);
   for (const file of files) {
+    const literal = `:(literal)${file}`;
+    const staged = stagedSet.has(file) ? await runGit(root, ['diff', '--cached', ...diffFlags, '--unified=5', ...base ? [base] : [], '--', literal], signal, config.maxDiffBytes) : '';
+    const working = workingSet.has(file) ? await runGit(root, ['diff', ...diffFlags, '--unified=5', '--', literal], signal, config.maxDiffBytes) : '';
+    const patch = `${staged ? `STAGED: base to index (old lines=base, new lines=index)\n${staged}` : ''}${working ? `\nUNSTAGED: index to worktree (old lines=index, new lines=worktree)\n${working}` : ''}`;
+    if (Buffer.byteLength(patch) > config.maxDiffBytes) throw new Error(`${file}: diff одного файла превышает ${config.maxDiffBytes} байт. Сузь изменения или увеличь maxDiffBytes.`);
+    fileDiffs.set(file, patch);
     const sides = {};
     for (const [side, spec] of [['index', `:${file}`], ...base ? [['base', `${base}:${file}`]] : []]) {
       try {
         const text = await runGit(root, ['show', '--no-ext-diff', '--no-textconv', spec], signal, config.maxFileBytes);
         if (!text.includes('\0')) sides[side] = text;
-      } catch (error) { signal?.throwIfAborted(); }
+      } catch (error) { signal?.throwIfAborted(); if (error.code === 'ERR_CHILD_PROCESS_STDIO_MAXBUFFER') throw new Error(`${side}:${file}: превышен maxFileBytes=${config.maxFileBytes}. Сузь изменения или увеличь лимит.`); }
     }
     revisions.set(file, sides);
   }
-  return { root, base, head: head.trim(), files, untracked: new Set(untracked), diff, revisions };
+  const diff = [...fileDiffs.values()].join('\n');
+  return { root, base, head: head.trim(), files, untracked: new Set(untracked), diff, revisions, fileDiffs };
 }

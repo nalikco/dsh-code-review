@@ -42,6 +42,7 @@ export function deduplicate(findings) {
 }
 export function formatReport({ evidence, findings, limitations, fix, verification, stale }) {
   const lines = ['## Code review', '', `Область: ${evidence.files.length} файлов. Режим: ${fix ? 'review и передача исправлений в штатный ход' : 'без записи'}.`];
+  if (evidence.batches?.length > 1) lines.push(`Разбито на ${evidence.batches.length} пакетов, не более ${Math.max(...evidence.batches.map(batch => Buffer.byteLength(batch.evidence)))} байт evidence в каждом. Все файлы включены.`);
   if (stale) lines.push('', '**Изменения устарели во время анализа. Результаты предварительные, исправления не передавались.**');
   for (const [label, categories] of [['Ошибки', ['bug']], ['Улучшения', ['quality', 'efficiency']]]) {
     const items = findings.filter(f => categories.includes(f.category)); if (!items.length) continue;

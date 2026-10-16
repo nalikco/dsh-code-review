@@ -7,7 +7,8 @@ export const HELP = `/code-review [--fix] [--base <ref>] [--focus <text>]
 --help: справка.
 
 Никаких commit, push, GitHub-комментариев или запуска команд из репозитория.
-PR и автоматический запуск тестов в версии 0.1 не поддерживаются.
+PR и автоматический запуск тестов не поддерживаются.
+Большая область разбивается по файлам на пакеты до maxDiffBytes (500000 байт), не более maxReviewBatches (8). Полные версии файлов не дублируются в промпте. Превышение лимита одного файла или числа пакетов останавливает команду без обрезки.
 Не редактируй файлы параллельно с --fix: проверка версии SDK не является атомарным CAS относительно внешнего редактора.`;
 
 function tokenize(input) {
@@ -50,7 +51,7 @@ export function parseOptions(input = '') {
   return result;
 }
 
-export const DEFAULTS = Object.freeze({ maxFiles: 80, maxDiffBytes: 500000, maxFileBytes: 250000, maxFindings: 18, maxValidations: 12, timeoutMs: 600000 });
+export const DEFAULTS = Object.freeze({ maxFiles: 80, maxDiffBytes: 500000, maxFileBytes: 250000, maxReviewBatches: 8, maxFindings: 18, maxValidations: 12, timeoutMs: 600000 });
 export function resolveConfig(config = {}) {
   const result = { ...DEFAULTS };
   for (const [key, value] of Object.entries(config)) {

@@ -36,22 +36,27 @@ export function createHandler(ctx, rawConfig, reviewer, dependencies = {}) {
       const changes = await collect(cwd, options, config, combined);
       if (!changes.files.length) return { kind: 'success', text: 'Нет Git-изменений для review. Автоматический выбор случайных недавних файлов не выполняется.' };
       evidence = await loadEvidence(fs, changes, config, combined);
-      const sameChanges = other => other.root === changes.root && other.base === changes.base && other.head === changes.head && other.diff === changes.diff && JSON.stringify(other.files) === JSON.stringify(changes.files) && JSON.stringify([...(other.revisions ?? [])]) === JSON.stringify([...(changes.revisions ?? [])]);
+      const sameChanges = other => other.root === changes.root && other.base === changes.base && other.head === changes.head && other.diff === changes.diff && JSON.stringify(other.files) === JSON.stringify(changes.files) && JSON.stringify([...(other.revisions ?? [])]) === JSON.stringify([...(changes.revisions ?? [])]) && JSON.stringify([...(other.fileDiffs ?? [])]) === JSON.stringify([...(changes.fileDiffs ?? [])]) && JSON.stringify([...(other.untracked ?? [])].sort()) === JSON.stringify([...(changes.untracked ?? [])].sort());
       if (!sameChanges(await collect(cwd, options, config, combined))) throw new Error('Git-изменения изменились при сборе evidence. Повтори команду.');
       await assertUnchanged(fs, evidence, config, combined);
       limitations.push(...evidence.limitations);
-      const run = async prompt => normalizeReport(await reviewer(ctx, agent, prompt, combined), evidence, config.maxFindings);
-      const reviews = await mapBounded(LANES, 3, lane => run(reviewPrompt(lane, evidence, options, config)));
+      const batchViews = evidence.batches.map((batch, index) => ({ ...evidence, ...batch, batchIndex: index + 1, batchCount: evidence.batches.length }));
+      const run = async (prompt, view) => { combined.throwIfAborted(); return normalizeReport(await reviewer(ctx, agent, prompt, combined), view, config.maxFindings); };
+      const tasks = batchViews.flatMap(view => LANES.map(lane => ({ lane, view })));
+      const reviews = await mapBounded(tasks, 3, ({ lane, view }) => run(reviewPrompt(lane, view, options, config), view));
       for (let i = 0; i < reviews.length; i++) {
         const result = reviews[i];
-        if (result.status === 'rejected') limitations.push(`${LANES[i][0]}: ${result.reason.message}`);
+        if (result.status === 'rejected') limitations.push(`Пакет ${tasks[i].view.batchIndex}, ${tasks[i].lane[0]}: ${result.reason.message}`);
         else { findings.push(...result.value.findings); limitations.push(...result.value.limitations); }
       }
+      const incompleteBatch = batchViews.some(view => tasks.map((task, index) => ({ task, result: reviews[index] })).filter(item => item.task.view === view).every(item => item.result.status === 'rejected'));
+      if (incompleteBatch) limitations.push('Хотя бы один пакет не проверен ни одним направлением. Review неполный, --fix запрещён.');
       combined.throwIfAborted();
       const candidates = deduplicate(findings); findings = [];
       if (candidates.length > config.maxValidations) limitations.push(`${candidates.length - config.maxValidations} находок не проверены из-за лимита и не включены в подтверждённые.`);
       const validations = await mapBounded(candidates.slice(0, config.maxValidations), 3, async candidate => {
-        const report = await run(validationPrompt(candidate, evidence, options));
+        const view = batchViews.find(batch => batch.files.includes(candidate.file));
+        const report = await run(validationPrompt(candidate, view, options), view);
         if (report.findings.length > 1 || report.findings.some(f => f.id !== candidate.id || f.file !== candidate.file || f.category !== candidate.category || f.side !== candidate.side)) throw new Error('Validator changed candidate identity');
         return report;
       });
@@ -65,14 +70,14 @@ export function createHandler(ctx, rawConfig, reviewer, dependencies = {}) {
         await assertUnchanged(fs, evidence, config, combined);
         if (!sameChanges(await collect(cwd, options, config, combined))) throw new Error('Git diff, HEAD или список файлов изменились во время review.');
       } catch (error) { combined.throwIfAborted(); stale = true; limitations.push(error.message); }
-      if (options.fix && !stale) {
+      if (options.fix && !stale && !incompleteBatch) {
         if (!dependencies.scheduleFix) throw new Error('Штатный scheduler исправлений недоступен; host-записи запрещены.');
         combined.throwIfAborted();
         fix = await dependencies.scheduleFix({ agent, evidence, findings, config, signal: combined });
         verification = fix.queued.length ? 'исправления переданы в обычный ход родителя; результаты и частичные записи видны в штатном журнале tools. После завершения повтори /code-review.' : null;
       }
       combined.throwIfAborted();
-      return { kind: reviews.every(r => r.status === 'rejected') || fix?.error || stale ? 'error' : 'success', text: formatReport({ evidence, findings, limitations, fix, verification, stale }) };
+      return { kind: incompleteBatch || fix?.error || stale ? 'error' : 'success', text: formatReport({ evidence, findings, limitations, fix, verification, stale }) };
     } catch (error) {
       const prefix = combined.aborted ? 'Code review отменён или истёк лимит ожидания.' : `Code review остановлен: ${error.message}`;
       return { kind: 'error', text: evidence ? prefix + '\n\n' + formatReport({ evidence, findings, limitations: [...limitations, String(error.message)], fix, verification, stale }) : prefix };

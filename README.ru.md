@@ -4,7 +4,7 @@
 
 Команда `/code-review` для [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness): корректность/безопасность, переиспользование/качество и эффективность. По умолчанию без изменений исходных файлов. Три параллельных reviewer и независимая проверка находок.
 
-Версия **1.0.1**, [MIT](LICENSE).
+Версия **1.0.2**, [MIT](LICENSE).
 
 ## Установка
 
@@ -36,7 +36,7 @@ https://github.com/nalikco/dsh-code-review.git
 * Находки имеют координаты `worktree`, `index` или `base`. Ошибки отдельно от улучшений, malformed finding не уничтожает соседние находки, high не вытесняется low.
 * Модель/reasoning наследуются из последнего запроса сессии. Нужен свободный родительский агент и локальный host-backed Git workspace.
 
-Плагин собирает bounded diff, snapshots версий и scoped AGENTS.md/CLAUDE.md внутри repo. Reviewer могут читать дополнительный контекст только read/glob/grep, без shell/MCP/делегирования/записей. После независимой валидации повторно проверяются diff/HEAD/files/versions/instructions. При изменениях отчёт предварительный, статус error, fix не передаётся.
+Плагин собирает diff по файлам, snapshots версий и scoped AGENTS.md/CLAUDE.md внутри repo. Полные base/index/worktree остаются host-side для координат и freshness, а не дублируются в промптах. В промптах diff, numbered untracked content, доступные версии и применимые инструкции. Большая область разбивается по целым файлам на пакеты до maxDiffBytes (500000 байт каждый), максимум maxReviewBatches (8). Staged/unstaged одного файла не разделяются. Все файлы включены, ничего не обрезается. Если один файл/его инструкции не помещаются или превышен maxFileBytes/число пакетов, команда явно остановится до model calls. Reviewer читают дополнительный контекст read/glob/grep, без shell/MCP/делегирования/записей. После независимой валидации повторно проверяются diff/HEAD/files/versions/instructions. При изменениях отчёт предварительный, статус error, fix не передаётся.
 
 ## Как работает `--fix`
 
@@ -66,12 +66,13 @@ PR, comments, commit/push, auto test/typecheck/lint не реализованы.
         maxFiles: 80
         maxDiffBytes: 500000
         maxFileBytes: 250000
+        maxReviewBatches: 8
         maxFindings: 18
         maxValidations: 12
         timeoutMs: 600000
 ```
 
-Положительные целые до четырёх default значений. Параллелизм3. Цена: 3 reviewers +до12 validators, с --fix ещё обычный ход родителя. Это может быть дорого на модели сессии. Timeout/cancellation распространяются на связанную работу. Для удаления отключи/удали bundle через Plugin Manager.
+Положительные целые до четырёх default значений. Параллелизм3 на команду для всех пакетов/направлений. Цена: 3 reviewers на пакет +до12 validators суммарно на команду, с --fix ещё обычный ход родителя. Это может быть дорого на модели сессии. Timeout/cancellation распространяются на связанную работу. Для удаления отключи/удали bundle через Plugin Manager.
 
 ## Разработка
 

@@ -65,3 +65,23 @@ test('staged line beyond worktree length remains a valid index finding', async (
  const finding = { id: 'x', side: 'index', file: 'a.js', line: 5, title: 'Missing', category: 'bug', severity: 'high', explanation: 'undefined call', evidence: 'missing()', safeToFix: true, edits: [] };
  const report = normalizeReport({ findings: [finding], limitations: [] }, evidence, 18); assert.equal(report.findings.length, 1); assert.equal(report.findings[0].safeToFix, false);
 });
+test('per-file collection uses literal pathspecs for wildcard filenames', async () => {
+ const root = await repo(); await writeFile(path.join(root, '[a].js'), 'literal old\n'); await writeFile(path.join(root, 'a.js'), 'ordinary old\n'); run(root, 'add', '.'); run(root, 'commit', '-qm', 'paths');
+ await writeFile(path.join(root, '[a].js'), 'literal new\n'); await writeFile(path.join(root, 'a.js'), 'ordinary new\n');
+ const changes = await collectChanges(root, {}, DEFAULTS, new AbortController().signal);
+ assert.match(changes.fileDiffs.get('[a].js'), /literal new/); assert.doesNotMatch(changes.fileDiffs.get('[a].js'), /ordinary new/);
+ assert.match(changes.fileDiffs.get('a.js'), /ordinary new/); assert.doesNotMatch(changes.fileDiffs.get('a.js'), /literal new/);
+});
+test('real aggregate diff above budget is split without stopping collection', async () => {
+ const root = await repo();
+ for (const name of ['a.js', 'b.js', 'c.js']) await writeFile(path.join(root, name), 'old\n'); run(root, 'add', '.'); run(root, 'commit', '-qm', 'three');
+ for (const name of ['a.js', 'b.js', 'c.js']) await writeFile(path.join(root, name), ('changed ' + name + '\n').repeat(8000));
+ const config = { ...DEFAULTS, maxDiffBytes: 200000 }, signal = new AbortController().signal;
+ const changes = await collectChanges(root, {}, config, signal); assert.ok(Buffer.byteLength(changes.diff) > config.maxDiffBytes);
+ const ctx = new Context(); new LocalFs(ctx, { cwd: root, diffBasisMaxBytes: 100000 });
+ const evidence = await loadEvidence(ctx.fs, changes, config, signal); assert.ok(evidence.batches.length > 1); assert.deepEqual(evidence.batches.flatMap(b => b.files), changes.files);
+});
+test('oversized historical snapshot is explicit maxFileBytes error', async () => {
+ const root = await repo(); await writeFile(path.join(root, 'a.js'), 'x'.repeat(1000)); run(root, 'add', 'a.js');
+ await assert.rejects(collectChanges(root, {}, { ...DEFAULTS, maxFileBytes: 100 }, new AbortController().signal), /index:a.js: превышен maxFileBytes/);
+});

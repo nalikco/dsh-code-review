@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.0.2
+
+- Keep full worktree/index/base snapshots host-side instead of duplicating them in every review prompt.
+- Review large scopes in deterministic per-file batches, bounded by `maxDiffBytes` and `maxReviewBatches` (default eight), without omitting files or truncating evidence.
+- Collect literal per-file Git diffs, preserve staged/unstaged sides together, and route independent validators to the relevant batch with one command-wide validation cap and concurrency three.
+- Report explicit limits for oversized individual files/instructions and excessive batch counts before starting model work.
+
 ## 1.0.1
 
 - Fix `cannot get property "fs" without inject` when a command runs against an agent-loop context. Resolve active services with Cordis scoped `get()` without changing isolation, policy or lifecycle ownership.

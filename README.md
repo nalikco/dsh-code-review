@@ -4,7 +4,7 @@ English | [Русский](README.ru.md)
 
 A `/code-review` command for [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness), combining correctness/security, reuse/quality and efficiency review. Three read-only reviewers work in parallel, then independent validators check their findings. Source files are not modified by default.
 
-Version **1.0.1**. License: [MIT](LICENSE).
+Version **1.0.2**. License: [MIT](LICENSE).
 
 ## Requirements and installation
 
@@ -45,7 +45,7 @@ The child model/reasoning route is inherited from the parent's latest logged req
 
 ## Review pipeline
 
-1. Collect bounded Git diffs, worktree/index/base snapshots and scoped `AGENTS.md`/`CLAUDE.md` files within the repository. Oversized evidence fails rather than being silently truncated. Binary, symlink, inaccessible and oversized files have limited coverage.
+1. Collect per-file Git diffs, full worktree/index/base snapshots and scoped `AGENTS.md`/`CLAUDE.md` files. Full snapshots stay host-side for coordinates/freshness, not repeated in model prompts. Prompts contain diffs, numbered untracked contents, version metadata and applicable instructions. Whole-file bundles are packed deterministically under `maxDiffBytes` (default500000 bytes per batch), up to `maxReviewBatches` (default8). Staged and unstaged sides stay together. An oversized individual bundle/file or excessive batch count fails before model work; nothing is silently truncated. Binary, symlink and inaccessible files have explicit limited coverage.
 2. Run three independent read-only reviewers: correctness/security, reuse/quality and efficiency. They may inspect context with `read`, `glob` and `grep`, but cannot run shell commands, delegate, access MCP tools, write source files or escalate permissions.
 3. Deduplicate and independently validate findings with at most three validators in flight. Bugs and improvements are reported separately. Findings identify their `worktree`, `index` or `base` coordinates. Invalid findings do not discard valid siblings; higher-severity candidates are retained.
 4. Recheck diffs, HEAD, changed files, versions and instruction snapshots. A changed scope returns an error and a provisional report; no fix is handed off.
@@ -86,12 +86,13 @@ The bundle row is `code-review`:
         maxFiles: 80
         maxDiffBytes: 500000
         maxFileBytes: 250000
+        maxReviewBatches: 8
         maxFindings: 18
         maxValidations: 12
         timeoutMs: 600000
 ```
 
-Fields are positive integers capped at four times their defaults. Concurrency is fixed at three. Cost is three reviewers plus up to12 validators; `--fix` adds a normal parent turn. Session-model review can be expensive. Timeout/cancellation applies to the associated work.
+Fields are positive integers capped at four times their defaults. Concurrency is fixed at three per command across all batch/lane tasks. Cost is three reviewers per batch plus up to12 validators total per command; `--fix` adds a normal parent turn. Session-model review can be expensive. Timeout/cancellation applies to the associated work.
 
 ## Development and verification
 
