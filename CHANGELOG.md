@@ -1,6 +1,14 @@
 # Changelog
 
-## 1.0.2
+## 1.1.0
+
+- Replace the custom review engine with a thin command that queues a readable combined review/simplify prompt on the current agent.
+- Remove host Git/evidence collection, size limits/batching, finding JSON protocol, custom child orchestration, guards and fix scheduling.
+- Keep `--fix`, `--base`, `--focus` and `--help`; normal DSH tools, model, permissions and cancellation own execution.
+- Default no-edit behavior is now a prompt instruction, not an extra enforced sandbox. No plugin configuration is needed; old engine limits are unused.
+- Preserve Git history for rollback; no live profile changes are performed by this rewrite.
+
+## 1.0.2 (unpublished engine experiment)
 
 - Keep full worktree/index/base snapshots host-side instead of duplicating them in every review prompt.
 - Review large scopes in deterministic per-file batches, bounded by `maxDiffBytes` and `maxReviewBatches` (default eight), without omitting files or truncating evidence.

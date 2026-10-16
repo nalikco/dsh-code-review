@@ -2,77 +2,53 @@
 
 [English](README.md) | Русский
 
-Команда `/code-review` для [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness): корректность/безопасность, переиспользование/качество и эффективность. По умолчанию без изменений исходных файлов. Три параллельных reviewer и независимая проверка находок.
+Версия **1.1.0**, [MIT](LICENSE). Тонкая команда для [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness): передаёт текущему агенту читаемый промпт, объединяющий review корректности, качества и эффективности.
 
-Версия **1.0.2**, [MIT](LICENSE).
+```text
+/code-review
+/code-review --fix
+/code-review --base main
+/code-review --focus "обработка ошибок"
+/code-review --help
+```
+
+## Что делает плагин
+
+1. Регистрирует `/code-review`.
+2. Разбирает `--fix`, `--base`, `--focus` и `--help`.
+3. Ставит [промпт](REVIEW_PROMPT.md) в обычную очередь текущего агента через `followup`.
+
+Всё остальное делает агент штатными инструментами DSH: читает Git diff и инструкции проекта, запускает три направления review через доступные subagents, проверяет находки и выдаёт результат. Если делегирование недоступно, промпт просит пройти три направления самостоятельно и сообщить об ограничении. Модель, права, подтверждения и отмена обычного хода остаются у DSH.
+
+**По умолчанию промпт просит не править исходники. Это инструкция агенту, не жёсткая read-only песочница.** `--fix` просит применить подтверждённые исправления и полезные локальные упрощения, проверить итоговый diff и запустить доступные релевантные проверки. Commit, push, deploy и публикацию комментариев промпт не разрешает.
+
+`--base ref` задаёт область относительно merge-base ref/HEAD. `--focus` задаёт дополнительную тему, несколько слов заключай в кавычки. Без `--base` промпт просит staged/unstaged отдельно и untracked source files. Если изменений нет, агент должен остановиться.
+
+Успех slash-команды означает **промпт поставлен в очередь**, не завершение review. Занятый агент закончит текущий ход прежде, чем возьмёт review. После передачи используй обычную отмену текущего/очередного хода DSH; выгрузка плагина не отменяет уже принятую задачу.
+
+## Чего больше нет
+
+Нет собственного сборщика Git, копий base/index/worktree в промпте, лимита 500 КБ, пакетного движка, JSON-протокола находок, model routing, ручного управления детьми, дополнительных guards или механизма исправлений. Контекст и размер чтений выбирает агент в рамках обычных ограничений DSH и модели. Старые настройки maxFiles/maxDiffBytes/maxFileBytes/maxReviewBatches/maxFindings/maxValidations/timeoutMs больше не используются.
+
+Это сознательное упрощение. Проверка находок и соблюдение analysis-only теперь зависят от модели, как у обычной команды с промптом. Нельзя обещать гарантированно read-only исполнение или доказанную корректность review.
 
 ## Установка
 
-Требуются Node.js22+, локальный Git и DSH со штатными сервисами commands/agents/tools/systemPrompt/fs/sandboxPolicy. Проверены SDK пакеты **0.2.0-rc.2**, Cordis `~4.0.4`, Schemastery `~3.18.4`; другие версии не гарантированы. Linux/Docker проверен локально, macOS включён в CI; Windows/remote fs не заявлены.
-
-В DSH открой **Plugins**, установку bundle и укажи:
+В DSH **Plugins → установка bundle**:
 
 ```text
 https://github.com/nalikco/dsh-code-review.git
 ```
 
-Для воспроизводимой установки укажи проверенный commit в формате `https://github.com/nalikco/dsh-code-review.git#<commit-sha>`. Также поддерживается установка абсолютного пути клона через Plugin Manager. Проверяй результат установки: `restart-required` требует перезапуска. Не регистрируй другую глобальную команду `code-review` одновременно.
+Можно закрепить проверенный commit: `https://github.com/nalikco/dsh-code-review.git#<commit-sha>` или установить абсолютный путь локального клона. Не активируй другую глобальную команду `code-review` одновременно. Проверяй installation status; `restart-required` требует перезапуска.
 
-Пакет не требует build/install scripts. `private: true` защищает от случайного npm publish и не мешает Git/local установке. Установка profile-wide влияет на все сессии и запускает host-код с правами пользователя ОС. Live-профиль автоматически не меняется от клонирования репозитория.
+Node.js22+, DSH service packages0.2.0-rc.2 и Cordis~4.0.4. Плагину нужен только service `commands`; `createUserMessage` берётся из штатного LLM SDK. Нет build/install scripts. `private:true` предотвращает случайную npm-публикацию, Git/local установка работает. Публикация в Git не обновляет установленный профиль автоматически.
 
-## Использование
+Настройки плагина не нужны. Для удаления отключи/удали bundle в Plugin Manager.
 
-```text
-/code-review
-/code-review --focus "обработка таймаутов"
-/code-review --base main
-/code-review --fix
-/code-review --help
-```
+## Данные и доверие
 
-* Default: staged и unstaged diff отдельно плюс untracked. Обратный unstaged diff не скрывает staged ошибку. Поддерживаются unborn/orphan ветки.
-* `--base ref`: staged часть от merge-base ref/HEAD, затем unstaged diff. Untracked включены.
-* `--focus`: тема review, не разрешение расширять права. Значения из нескольких слов в кавычках.
-* Находки имеют координаты `worktree`, `index` или `base`. Ошибки отдельно от улучшений, malformed finding не уничтожает соседние находки, high не вытесняется low.
-* Модель/reasoning наследуются из последнего запроса сессии. Нужен свободный родительский агент и локальный host-backed Git workspace.
-
-Плагин собирает diff по файлам, snapshots версий и scoped AGENTS.md/CLAUDE.md внутри repo. Полные base/index/worktree остаются host-side для координат и freshness, а не дублируются в промптах. В промптах diff, numbered untracked content, доступные версии и применимые инструкции. Большая область разбивается по целым файлам на пакеты до maxDiffBytes (500000 байт каждый), максимум maxReviewBatches (8). Staged/unstaged одного файла не разделяются. Все файлы включены, ничего не обрезается. Если один файл/его инструкции не помещаются или превышен maxFileBytes/число пакетов, команда явно остановится до model calls. Reviewer читают дополнительный контекст read/glob/grep, без shell/MCP/делегирования/записей. После независимой валидации повторно проверяются diff/HEAD/files/versions/instructions. При изменениях отчёт предварительный, статус error, fix не передаётся.
-
-## Как работает `--fix`
-
-После review подтверждённые замены передаются в **обычный ход родителя**. Он читает файлы и использует штатный `edit` с сохранением Auto review, pre-execute/guards, observation и downstream freshness policy. **Успех команды означает queued, не завершение правок.** Результаты остаются в стандартном журнале tools даже при отмене. После хода повтори `/code-review` и отдельно запусти тесты проекта.
-
-Передача запрещена в plan mode/read-only/PTC-only. Нужен штатный `edit` в native/both presentation. На время fix разрешены только reads и exact validated edits, без shell/делегирования/escalation/публикаций. Любая ошибка инструмента останавливает дальнейшие правки. Отмена/выгрузка плагина отменяет fix и не удаляет чужую очередь.
-
-Только существующие changed worktree files. Без create/delete, cross-file fixes и изменения AGENTS.md/CLAUDE.md. Находки index/base только показываются. Auto вправе отказать, поскольку машинное followup не выдаётся за новую human-authority.
-
-**Не редактируй worktree параллельно с `--fix`.** SDK guard не является атомарным CAS относительно внешнего редактора; окно между version probe и rename остаётся. Межфайловой транзакции/автоматического rollback нет. LLM не гарантирует корректность исправления.
-
-## Данные и границы
-
-Diff, исходники, инструкции и прочитанный контекст отправляются настроенному LLM-провайдеру и могут сохраняться в DSH session/spill. Не проверяй секреты или закрытый код без соответствующего разрешения. У плагина нет своего telemetry endpoint/провайдера. Подробности: [SECURITY.md](SECURITY.md).
-
-Git выполняется host-side без shell, GIT_* overrides очищаются, hooks/fsmonitor off, submodules short/nonrecursive, clean/process filters и partial clone отклоняются. Git config, бинарник и host-плагины доверенные. Враждебные same-user процессы вне модели защиты.
-
-PR, comments, commit/push, auto test/typecheck/lint не реализованы. Review read-only относится к исходникам, не к служебным логам DSH. Дополнительные инструкции вне repo зависят от preset. Command report вне model history; --fix явно доставляет предложения родителю.
-
-## Настройки
-
-```yaml
-- insert:
-    - id: code-review
-      name: dsh-code-review
-      config:
-        maxFiles: 80
-        maxDiffBytes: 500000
-        maxFileBytes: 250000
-        maxReviewBatches: 8
-        maxFindings: 18
-        maxValidations: 12
-        timeoutMs: 600000
-```
-
-Положительные целые до четырёх default значений. Параллелизм3 на команду для всех пакетов/направлений. Цена: 3 reviewers на пакет +до12 validators суммарно на команду, с --fix ещё обычный ход родителя. Это может быть дорого на модели сессии. Timeout/cancellation распространяются на связанную работу. Для удаления отключи/удали bundle через Plugin Manager.
+Агент читает исходники и отправляет контекст настроенному LLM-провайдеру, DSH может сохранять сообщения/результаты инструментов. Не проверяй закрытый код или секреты без соответствующего разрешения. Плагин не добавляет свой провайдер/телеметрию и не выполняет shell/Git самостоятельно. Подробнее: [SECURITY.md](SECURITY.md).
 
 ## Разработка
 
@@ -82,6 +58,6 @@ npm run test:all
 npm run test:package
 ```
 
-`npm test` не требует SDK. Integration устанавливаются из публичных npm SDK пакетов, private извлечение DSH не нужно. Test adapters scripted, Auto проверяется policy-deny fixture, а не живой risk model. Живая LLM/GUI не проверены. Подробнее: [CONTRIBUTING.md](CONTRIBUTING.md), [CHANGELOG.md](CHANGELOG.md).
+Проверяется разбор аргументов, содержание промпта, регистрация/выгрузка, передача в текущий агент и обычная очередь на настоящем SDK, состав и активация tarball. Scripted adapter не доказывает качество живого review. Подробнее: [CONTRIBUTING.md](CONTRIBUTING.md), [CHANGELOG.md](CHANGELOG.md).
 
-Концепция вдохновлена [официальным code-review plugin](https://github.com/anthropics/claude-code/blob/main/plugins/code-review/commands/code-review.md) и [опубликованным Simplify prompt](https://github.com/dsdanielpark/claude-code-system-prompts/blob/main/system-prompts/skill-simplify.md). Не аффилирован с Anthropic; промпт и политика являются самостоятельной реализацией.
+Идея вдохновлена [официальным code-review plugin](https://github.com/anthropics/claude-code/blob/main/plugins/code-review/commands/code-review.md) и [опубликованным Simplify prompt](https://github.com/dsdanielpark/claude-code-system-prompts/blob/main/system-prompts/skill-simplify.md). Самостоятельная реализация, не аффилирована с Anthropic.

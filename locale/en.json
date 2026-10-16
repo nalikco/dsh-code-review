@@ -1,1 +1,1 @@
-{"meta":{"title":"Code Review","description":"Read-only review for correctness, reuse and efficiency, with explicit version-checked fixes."}}
+{"meta":{"title":"Code Review","description":"A review prompt for the current agent: correctness, reuse and efficiency, with optional --fix."}}

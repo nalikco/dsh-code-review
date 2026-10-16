@@ -1,15 +1,17 @@
 export const HELP = `/code-review [--fix] [--base <ref>] [--focus <text>]
 
-По умолчанию: анализ staged, unstaged и untracked файлов без записи.
---base <ref>: изменения от merge-base с указанной веткой до рабочего дерева.
---fix: передать подтверждённые замены в обычный ход родителя через штатный edit. Tool guards, Auto, read-only и plan mode сохраняются; завершение команды не означает завершение исправлений. После хода повтори /code-review.
---focus <text>: дополнительный фокус, не расширяющий права команды.
---help: справка.
+Передаёт review-промпт текущему агенту в обычную очередь DSH.
+По умолчанию промпт просит только анализ, без правок исходников.
+--fix: просит проверить находки и исправить подтверждённые проблемы штатными инструментами.
+--base <ref>: изменения относительно merge-base указанной ветки с HEAD.
+--focus <text>: дополнительный фокус, несколько слов заключай в кавычки.
+--help: справка без запуска агента.
 
-Никаких commit, push, GitHub-комментариев или запуска команд из репозитория.
-PR и автоматический запуск тестов не поддерживаются.
-Большая область разбивается по файлам на пакеты до maxDiffBytes (500000 байт), не более maxReviewBatches (8). Полные версии файлов не дублируются в промпте. Превышение лимита одного файла или числа пакетов останавливает команду без обрезки.
-Не редактируй файлы параллельно с --fix: проверка версии SDK не является атомарным CAS относительно внешнего редактора.`;
+Три направления: корректность/безопасность, переиспользование/качество, эффективность.
+Плагин не вводит собственную песочницу, лимит diff или механизм исправлений.
+Режим без правок является инструкцией в промпте, а не жёстким read-only ограничением.
+Права, подтверждения, отмена, инструменты и subagents управляются самим DSH.
+Commit, push, deploy и публикация комментариев не разрешаются этой командой.`;
 
 function tokenize(input) {
   const tokens = []; let token = '', quote = null, started = false;
@@ -47,16 +49,6 @@ export function parseOptions(input = '') {
         result.base = value;
       } else result.focus = value;
     }
-  }
-  return result;
-}
-
-export const DEFAULTS = Object.freeze({ maxFiles: 80, maxDiffBytes: 500000, maxFileBytes: 250000, maxReviewBatches: 8, maxFindings: 18, maxValidations: 12, timeoutMs: 600000 });
-export function resolveConfig(config = {}) {
-  const result = { ...DEFAULTS };
-  for (const [key, value] of Object.entries(config)) {
-    if (!(key in DEFAULTS) || !Number.isSafeInteger(value) || value < 1 || value > DEFAULTS[key] * 4) throw new Error(`Invalid dsh-code-review config: ${key}`);
-    result[key] = value;
   }
   return result;
 }

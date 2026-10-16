@@ -10,8 +10,7 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const manifest = JSON.parse(await readFile(path.join(root, 'package.json'), 'utf8'));
 const expected = [
   'LICENSE', 'README.md', 'README.ru.md', 'SECURITY.md', 'package.json', 'cordis.patch.yml', 'icon.svg',
-  'locale/en.json', 'locale/ru.json', 'index.mjs', 'engine.mjs', 'findings.mjs', 'fix.mjs', 'git.mjs',
-  'options.mjs', 'prompts.mjs', 'runner.mjs', 'workspace.mjs', 'services.mjs',
+  'locale/en.json', 'locale/ru.json', 'index.mjs', 'options.mjs', 'prompt.mjs', 'REVIEW_PROMPT.md',
 ].sort();
 assert.equal(manifest.private, true);
 assert.equal(manifest.repository.url, 'git+https://github.com/nalikco/dsh-code-review.git');

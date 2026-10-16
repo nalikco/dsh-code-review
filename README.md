@@ -2,99 +2,57 @@
 
 English | [Русский](README.ru.md)
 
-A `/code-review` command for [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness), combining correctness/security, reuse/quality and efficiency review. Three read-only reviewers work in parallel, then independent validators check their findings. Source files are not modified by default.
+Version **1.1.0**, [MIT](LICENSE). A thin `/code-review` command for [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness). It queues a readable review prompt on the current agent, combining correctness/security, reuse/quality and efficiency.
 
-Version **1.0.2**. License: [MIT](LICENSE).
+```text
+/code-review
+/code-review --fix
+/code-review --base main
+/code-review --focus "error handling"
+/code-review --help
+```
 
-## Requirements and installation
+## How it works
 
-- Node.js22+, Git and a local host-backed Git workspace.
-- DSH services `commands`, `agents`, `tools`, `systemPrompt`, `fs` and `sandboxPolicy`. Checked against **0.2.0-rc.2** service packages, Cordis `~4.0.4` and Schemastery `~3.18.4`. These are prerelease APIs; compatibility with other versions is not guaranteed.
-- An idle parent agent. Do not register another global command named `code-review` in the same layer.
-- Linux/Docker has been tested locally. CI also declares macOS checks. Windows and remote filesystems are not validated.
+The plugin registers the command, parses its arguments and submits [REVIEW_PROMPT.md](REVIEW_PROMPT.md) through the current agent's normal `followup` queue. The agent does the work with ordinary DSH tools: inspect Git diffs and project instructions, run three review directions using available subagents, validate findings and report the result. If delegation is unavailable, the prompt asks the agent to perform the three passes itself and disclose that limitation.
 
-In DSH, open **Plugins**, choose bundle installation and enter:
+**Analysis-only is a prompt instruction, not a hard read-only sandbox.** With `--fix`, the prompt asks for confirmed fixes and useful local simplifications, an inspection of the final diff and relevant available checks. It does not authorize commit, push, deploy or publishing GitHub comments. DSH owns normal tools, model selection, permissions, approvals, plan mode, cancellation and subagents; the plugin does not implement another policy layer.
+
+| Option | Meaning |
+| --- | --- |
+| Default | Ask for review only, without source-file edits; staged/unstaged separately plus relevant untracked source files. |
+| `--fix` | Ask the current agent to apply confirmed fixes through ordinary session tools after review. |
+| `--base <ref>` | Review relative to the merge-base of this ref and HEAD, including working-tree changes. |
+| `--focus "text"` | Additional topic; quote values containing spaces. |
+| `--help` | Show help without waking the agent. |
+
+Command success means **queued**, not that review finished. If the agent is busy, review follows its current turn. After handoff use ordinary DSH turn/queue controls to stop the work. Unloading this plugin removes the slash command but does not cancel tasks the agent already accepted.
+
+## Deliberately small
+
+No custom Git collector, duplicated base/index/worktree snapshots, 500 KB diff limit, batching engine, finding JSON protocol, provider routing, child-agent lifecycle management, extra tool guards or fix scheduler. The agent chooses context and reads within normal DSH/model limits. The old maxFiles/maxDiffBytes/maxFileBytes/maxReviewBatches/maxFindings/maxValidations/timeoutMs settings no longer apply.
+
+This is intentional: like a normal prompt command, finding validation and analysis-only behavior depend on the model. Do not treat the prompt as a security boundary or proof of correctness.
+
+## Installation
+
+In DSH **Plugins → bundle installation**, enter:
 
 ```text
 https://github.com/nalikco/dsh-code-review.git
 ```
 
-For a reproducible installation, pin a reviewed commit: `https://github.com/nalikco/dsh-code-review.git#<commit-sha>`. Alternatively clone the repository and install its absolute directory through Plugin Manager.
+Pin a reviewed commit with `https://github.com/nalikco/dsh-code-review.git#<commit-sha>` or install the absolute path of a local clone. Do not register another global `code-review` command in the same layer. Inspect the installation result: `restart-required` means a restart is needed.
 
-No build or install scripts are required. `private: true` intentionally prevents accidental npm registry publication; Git/local-directory installation remains supported. Profile-wide installation affects every session in that profile and runs host code with your OS permissions. Inspect the installation result: `restart-required` means a restart is needed. Cloning the repository alone does not change the live profile. Disable or remove the bundle through Plugin Manager to uninstall.
+Requires Node.js22+, DSH service packages0.2.0-rc.2 and Cordis~4.0.4. The only injected service is `commands`; message creation uses the normal LLM SDK. No build/install scripts. `private:true` prevents accidental npm publication while Git/local installation remains supported. Publishing Git changes does not update a running profile automatically.
 
-## Usage
+No plugin configuration is needed. Disable/remove the bundle in Plugin Manager to uninstall.
 
-```text
-/code-review
-/code-review --focus "timeout handling"
-/code-review --base main
-/code-review --fix
-/code-review --help
-```
+## Data and trust
 
-| Option | Behavior |
-| --- | --- |
-| Default | Separate staged and unstaged diffs plus untracked files. An inverse unstaged diff does not hide staged changes. Unborn/orphan branches are supported. |
-| `--base <ref>` | Staged changes relative to the merge-base of the ref and HEAD, followed by unstaged changes. Includes untracked files. |
-| `--focus "text"` | Additional review topic, not permission to widen scope or access. Quote values containing spaces. |
-| `--fix` | Hand validated worktree replacements to a normal parent turn, preserving its tool policies. **Queued does not mean applied.** |
-| `--help` | Command help. |
+The agent may read source code and send it to the configured LLM provider; DSH may persist messages and tool results. Do not review private code or secrets without authorization. This plugin adds no provider or telemetry endpoint and does not execute shell/Git itself. See [SECURITY.md](SECURITY.md).
 
-The child model/reasoning route is inherited from the parent's latest logged request, falling back to creation options before the first request. A pending UI model selection is not used until it becomes effective in the parent request.
-
-## Review pipeline
-
-1. Collect per-file Git diffs, full worktree/index/base snapshots and scoped `AGENTS.md`/`CLAUDE.md` files. Full snapshots stay host-side for coordinates/freshness, not repeated in model prompts. Prompts contain diffs, numbered untracked contents, version metadata and applicable instructions. Whole-file bundles are packed deterministically under `maxDiffBytes` (default500000 bytes per batch), up to `maxReviewBatches` (default8). Staged and unstaged sides stay together. An oversized individual bundle/file or excessive batch count fails before model work; nothing is silently truncated. Binary, symlink and inaccessible files have explicit limited coverage.
-2. Run three independent read-only reviewers: correctness/security, reuse/quality and efficiency. They may inspect context with `read`, `glob` and `grep`, but cannot run shell commands, delegate, access MCP tools, write source files or escalate permissions.
-3. Deduplicate and independently validate findings with at most three validators in flight. Bugs and improvements are reported separately. Findings identify their `worktree`, `index` or `base` coordinates. Invalid findings do not discard valid siblings; higher-severity candidates are retained.
-4. Recheck diffs, HEAD, changed files, versions and instruction snapshots. A changed scope returns an error and a provisional report; no fix is handed off.
-
-The command report is outside model history. Only explicit `--fix` delivers proposals to the parent. Review children are one-shot and do not use the standard continuable-subagent catalog.
-
-## Policy-preserving fixes
-
-`--fix` **does not write through host filesystem APIs**. After review, exact validated replacements are submitted to a normal parent turn. The parent reads the files and uses its existing `edit` tool. Existing Auto review, pre-execute decisions, monotonic guards, observations and downstream freshness policies remain authoritative.
-
-A successful slash command means the proposals were **queued**, not that edits completed. Actual edits and partial results appear in the normal tool log, including on cancellation. After the parent turn, run `/code-review` again and run the relevant project tests separately. There is no automatic post-fix review.
-
-- Fix handoff is refused in read-only, active/pending plan mode and PTC-only presentation. Native/both presentation needs the standard `edit` tool.
-- The fix turn is narrowed to reads and exact validated edits. Shell, delegation, escalation, publication and unrelated edits are denied. A tool failure stops further mutations. Cancellation/unload cancels the fix without clearing unrelated queued user input.
-- Only existing changed worktree files are eligible. No file creation/deletion, instruction-file changes or cross-file fixes. Index/base findings are report-only.
-- Auto may refuse a fix requiring additional human authority. Machine-generated replacement data is not disguised as a new authenticated human instruction.
-- **Do not edit the worktree concurrently with `--fix`.** SDK version checks are not atomic compare-and-swap against an external editor: a window remains between version probe and atomic rename. There is no multi-file transaction or automatic rollback. LLM validation does not guarantee a correct patch.
-
-Version 1.0.0 is the initial public release. Earlier 0.1.x builds were unpublished development prototypes; see [CHANGELOG.md](CHANGELOG.md).
-
-## Data and security
-
-Diffs, source snapshots, instructions and context read by reviewers are sent to the session's configured LLM provider and may persist in DSH session/spill storage. Do not review secrets or proprietary code without the appropriate authorization. This plugin adds no telemetry endpoint or model provider. Read [SECURITY.md](SECURITY.md) before installing.
-
-Host Git runs without a shell. Inherited `GIT_*` overrides are cleared, hooks/fsmonitor disabled, lazy fetch disabled and submodule diffs forced short/nonrecursive. Clean/process filters and partial-clone fetching are refused. The installed Git, configuration files and other host plugins are trusted; same-user malicious processes racing local configuration are outside the threat model.
-
-No PR support, GitHub comments, commit/push, automated project tests/typecheck/lint or recursive submodule review. Read-only means no source-file changes, not zero writes to ordinary DSH logs/spill files. Instructions outside the repository depend on the normal preset composition. LLM review supplements rather than replaces tests and human review.
-
-## Configuration
-
-The bundle row is `code-review`:
-
-```yaml
-- insert:
-    - id: code-review
-      name: dsh-code-review
-      config:
-        maxFiles: 80
-        maxDiffBytes: 500000
-        maxFileBytes: 250000
-        maxReviewBatches: 8
-        maxFindings: 18
-        maxValidations: 12
-        timeoutMs: 600000
-```
-
-Fields are positive integers capped at four times their defaults. Concurrency is fixed at three per command across all batch/lane tasks. Cost is three reviewers per batch plus up to12 validators total per command; `--fix` adds a normal parent turn. Session-model review can be expensive. Timeout/cancellation applies to the associated work.
-
-## Development and verification
+## Development
 
 ```sh
 npm ci --ignore-scripts
@@ -102,6 +60,6 @@ npm run test:all
 npm run test:package
 ```
 
-`npm test` has no SDK dependency. Integration tests install public npm SDK packages, not a private extracted Desktop checkout. They exercise real DSH services, Git and filesystem operations with scripted LLM adapters. Auto is tested with a policy-deny fixture, not a live risk model. Live-model quality, live GUI rendering and every provider/preset combination are not established by these tests. See [CONTRIBUTING.md](CONTRIBUTING.md).
+Tests cover arguments, prompt content, registration/unload, normal-agent handoff/queue semantics on real DSH SDK services, and the packed artifact. Scripted adapters do not establish live-model review quality. See [CONTRIBUTING.md](CONTRIBUTING.md) and [CHANGELOG.md](CHANGELOG.md).
 
-Inspired by the [official code-review plugin](https://github.com/anthropics/claude-code/blob/main/plugins/code-review/commands/code-review.md) and a [published Simplify prompt](https://github.com/dsdanielpark/claude-code-system-prompts/blob/main/system-prompts/skill-simplify.md). Not affiliated with Anthropic; this package implements its own prompts and execution policy.
+Inspired by the [official code-review plugin](https://github.com/anthropics/claude-code/blob/main/plugins/code-review/commands/code-review.md) and a [published Simplify prompt](https://github.com/dsdanielpark/claude-code-system-prompts/blob/main/system-prompts/skill-simplify.md). Independent implementation, not affiliated with Anthropic.
