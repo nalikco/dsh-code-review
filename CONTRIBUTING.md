@@ -16,7 +16,7 @@ For core tests only, `npm test` requires no dependency installation. Integration
 
 ## CI
 
-The workflow declares Linux/macOS and Node22/24. It runs clean dependency installation, unit/integration tests and the packed-artifact check. A local run is not evidence that GitHub-hosted CI has passed: check the actual workflow after an authorized push.
+The workflow declares Linux/macOS and Node22/24. It removes the hosted image's Git LFS filter defaults from both global and system Git configuration on the disposable runner, then runs clean dependency installation, unit/integration tests and the packed-artifact check. Production review intentionally rejects configured executable filters, including unused Git LFS defaults; this check must not be disabled to make CI green. Git environment overrides alone cannot isolate these tests because the production Git launcher clears inherited `GIT_*` controls. Do not run the runner configuration cleanup on your development machine. A local run is not evidence that GitHub-hosted CI has passed: check the actual workflow after an authorized push.
 
 ## Review requirements
 
