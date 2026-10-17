@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.2.1
+
+- Support DSH 0.2.1-rc.1. The plugin now declares its own `engines.dsh` range (`^0.2.0-rc.2`) so the DSH loader accepts both the 0.2.0-rc.2 and 0.2.1 prerelease runtimes instead of skipping the bundle for exact SDK peer pins.
+- Widen the four SDK peer ranges to `0.2.0-rc.2 || 0.2.1-rc.1`, so `npm ci` resolves the 0.2.1 SDK tree while 0.2.0-rc.2 consumers remain installable.
+- Refresh devDependencies and `package-lock.json` for SDK 0.2.1-rc.1, adding `dsh-fs-local` and `dsh-working-directory` for the integration host.
+- Mount the new `fs` and `workingDirectory` services plus the `tool-skill` adapter in integration tests; assert the plugin itself still injects only `commands` and `skills`.
+
 ## 1.2.0
 
 - Register the review instructions as an explicit-only native `dsh-code-review` skill.

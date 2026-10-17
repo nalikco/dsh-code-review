@@ -2,7 +2,7 @@
 
 English | [Русский](README.ru.md)
 
-Version **1.2.0**, [MIT](LICENSE). A small `/code-review` command backed by a **native DSH skill**, combining correctness/security, reuse/quality and efficiency.
+Version **1.2.1**, [MIT](LICENSE). A small `/code-review` command backed by a **native DSH skill**, combining correctness/security, reuse/quality and efficiency.
 
 ```text
 /code-review
@@ -44,7 +44,7 @@ https://github.com/nalikco/dsh-code-review.git
 
 Pin a reviewed commit using `#<commit-sha>` or install a local clone by absolute path. Inspect installation status; `restart-required` requires restart. Publishing Git changes does not update an installed profile automatically.
 
-Requires Node22+, DSH0.2.0-rc.2/Cordis~4.0.4, services `commands` and `skills`, and an **active native `dsh-tool-skill` adapter in the agent composition**. Installing an npm peer package alone does not activate that adapter. If skills are disabled in your preset, enable the shipped skill capability there before using this command.
+Requires Node22+, DSH0.2.1-rc.1/Cordis~4.0.5, services `commands` and `skills`, and an **active native `dsh-tool-skill` adapter in the agent composition**. Installing an npm peer package alone does not activate that adapter. If skills are disabled in your preset, enable the shipped skill capability there before using this command.
 
 Do not register another global `code-review` command or any project/user/preset skill named `dsh-code-review`: normal registry precedence can override the bundled skill. No plugin settings/build/install scripts. `private:true` prevents accidental npm publication, not Git/local installation. Uninstall through Plugin Manager.
 

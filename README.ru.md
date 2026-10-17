@@ -2,7 +2,7 @@
 
 [English](README.md) | Русский
 
-Версия **1.2.0**, [MIT](LICENSE). Небольшая команда `/code-review` на базе **штатного DSH skill**: корректность/безопасность, переиспользование/качество и эффективность.
+Версия **1.2.1**, [MIT](LICENSE). Небольшая команда `/code-review` на базе **штатного DSH skill**: корректность/безопасность, переиспользование/качество и эффективность.
 
 ```text
 /code-review
@@ -42,7 +42,7 @@ https://github.com/nalikco/dsh-code-review.git
 
 Можно закрепить проверенный commit через `#<commit-sha>` или поставить абсолютный путь локального клона. Проверяй installation status; `restart-required` требует перезапуска. Push не обновляет установленный профиль автоматически.
 
-Нужны Node22+, SDK DSH0.2.0-rc.2/Cordis~4.0.4, services `commands`/`skills` и **активный штатный `dsh-tool-skill` в композиции агента**. Само наличие npm peer dependency его не активирует. Если skills выключены в preset, сначала включи штатную capability.
+Нужны Node22+, SDK DSH0.2.1-rc.1/Cordis~4.0.5, services `commands`/`skills` и **активный штатный `dsh-tool-skill` в композиции агента**. Само наличие npm peer dependency его не активирует. Если skills выключены в preset, сначала включи штатную capability.
 
 Не регистрируй другую глобальную `code-review` команду или project/user/preset skill `dsh-code-review`: стандартный приоритет registry может заменить bundled skill. Настроек/build/install scripts нет. `private:true` защищает от случайного npm publish, Git/local установка работает. Удаление через Plugin Manager.
 

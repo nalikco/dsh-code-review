@@ -11,6 +11,8 @@ import AgentLoop from '@deepseek-ai/dsh-agent-loop';
 import LlmRuntime, { LlmAdapter, createUserMessage } from '@deepseek-ai/dsh-llm';
 import * as plugin from '../index.mjs';
 import Skills from '@deepseek-ai/dsh-skill';
+import LocalFileSystem from '@deepseek-ai/dsh-fs-local';
+import WorkingDirectory from '@deepseek-ai/dsh-working-directory';
 import * as toolSkill from '@deepseek-ai/dsh-tool-skill';
 import { SKILL_NAME, skill } from '../prompt.mjs';
 
@@ -32,7 +34,8 @@ class ScriptedAdapter extends LlmAdapter {
 }
 async function host(t) {
   const ctx = new Context();
-  for (const service of [Commands, SystemPrompt, ToolRuntime, SessionProjectionRegistry, SessionStore, AgentRegistry, LlmRuntime, Skills]) await mount(ctx, t, service);
+  for (const service of [Commands, SystemPrompt, ToolRuntime, SessionProjectionRegistry, SessionStore, AgentRegistry, LlmRuntime, Skills, LocalFileSystem]) await mount(ctx, t, service);
+  await mount(ctx, t, WorkingDirectory, { defaultDirectory: process.cwd() });
   await mount(ctx, t, toolSkill);
   const adapter = new ScriptedAdapter(); t.after(ctx.llm.registerAdapter(['test'], adapter));
   await mount(ctx, t, AgentLoop, { agents: [], maxParallelToolCalls: 3 });
@@ -49,7 +52,7 @@ test('command registers skill with no filesystem or custom review engine', async
 });
 test('actual slash command delivers prompt into existing normal model turn', async t => {
   const f = await host(t); const signal = new AbortController().signal;
-  assert.equal(f.ctx.get('fs'), undefined); assert.equal(f.ctx.get('sandboxPolicy'), undefined);
+  assert.deepEqual(plugin.inject, ['commands', 'skills']); assert.equal(f.ctx.get('sandboxPolicy'), undefined);
   const result = await f.ctx.commands.execute(f.agent, '/code-review --base main --focus "errors"', [], signal);
   assert.equal(result.result.kind, 'success'); await f.agent.whenIdle(); assert.equal(f.adapter.requests.length, 1);
   const text = f.adapter.requests[0].messages.flatMap(m => m.content ?? []).filter(b => b.type === 'text').map(b => b.text).join('\n');
