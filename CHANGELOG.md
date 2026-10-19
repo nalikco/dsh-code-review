@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.3.0
+
+- The `/code-review` slash command is removed; the plugin registers only the native skill, so it no longer appears twice in the `/` menu.
+- The skill is renamed from `dsh-code-review` to `code-review` and is now model-invocable as well as user-invocable.
+- Subagents are no longer mandatory: the agent performs the three review passes itself and delegates only for large changes, to save tokens.
+
 ## 1.2.2
 
 - The `/code-review` command no longer queues any user-attributed text. The invocation message itself carries `source.kind: 'skill-invocation'` (name `dsh-code-review`, form `instructions`), so Chat renders it as a native skill-invocation chip instead of a message that looks like it was typed by the user.

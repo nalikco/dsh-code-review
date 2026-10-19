@@ -1,14 +1,14 @@
 import { readFileSync } from 'node:fs';
 import { renderSkillContent } from '@deepseek-ai/dsh-skill';
 
-export const SKILL_NAME = 'dsh-code-review';
+export const SKILL_NAME = 'code-review';
 export const skill = {
   name: SKILL_NAME,
   provider: 'dsh-code-review',
   description: 'Review changes for correctness, reuse and efficiency; optionally apply confirmed fixes.',
   content: readFileSync(new URL('./REVIEW_PROMPT.md', import.meta.url), 'utf8'),
   source: 'dsh-code-review',
-  invocation: { userInvocable: true, modelInvocable: false },
+  invocation: { userInvocable: true, modelInvocable: true },
 };
 
 // The queued invocation is marked skill-invocation and carries the full

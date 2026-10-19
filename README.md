@@ -18,7 +18,7 @@ The plugin registers [REVIEW_PROMPT.md](REVIEW_PROMPT.md) as the explicit-only `
 
 Because the instructions travel inside the queued message, the standard `dsh-tool-skill` gesture scanner is not involved, and a queued review still runs with its instructions even if the plugin is unloaded afterwards.
 
-The agent uses normal DSH tools to inspect diffs and project instructions, run three review directions through available subagents, validate findings and report. If delegation is unavailable, the skill asks for three passes in the current agent with the limitation disclosed. The skill is user-invocable but not automatically model-invocable, so merely installing it does not start reviews.
+The agent uses normal DSH tools to inspect diffs and project instructions, run three review passes itself (subagents only for large changes, to save tokens), validate findings and report. The skill is invocable both by the user and by the model.
 
 **Analysis-only is a prompt instruction, not a hard read-only sandbox.** `--fix` asks for confirmed fixes/local simplifications, final-diff inspection and relevant available checks. No commit, push, deploy or public comments are authorized. DSH owns model, tools, permissions, approvals, plan mode, cancellation and subagents.
 
@@ -46,7 +46,7 @@ Pin a reviewed commit using `#<commit-sha>` or install a local clone by absolute
 
 Requires Node22+, DSH0.2.1-rc.2 (0.2.0-rc.2/0.2.1-rc.1 peers retained), Cordis~4.0.5 and services `commands` and `skills`. No plugin settings/build/install scripts. `private:true` prevents accidental npm publication, not Git/local installation. Uninstall through Plugin Manager.
 
-Do not register another global `code-review` command or any project/user/preset skill named `dsh-code-review`: a conflicting registration would shadow the skill and confuse the native gesture when `/dsh-code-review` is typed directly.
+Do not register another global `code-review` command or any project/user/preset skill named `code-review`: a conflicting registration would shadow the skill and confuse the native gesture when `/code-review` is typed directly.
 
 ## Deliberately small
 
