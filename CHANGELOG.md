@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.2.2
+
+- The `/code-review` command no longer queues any user-attributed text. The invocation message itself carries `source.kind: 'skill-invocation'` (name `dsh-code-review`, form `instructions`), so Chat renders it as a native skill-invocation chip instead of a message that looks like it was typed by the user.
+- The queued message embeds the full rendered `<skill_content>` instructions (via the native `renderSkillContent`) followed by the invocation parameters, so the `dsh-tool-skill` gesture scanner is no longer involved and no separate injection is needed. A queued review now survives plugin unload with its instructions intact.
+- The `@deepseek-ai/dsh-tool-skill` peer dependency is dropped; `@deepseek-ai/dsh-skill` is now a real runtime import. Peer ranges widened to cover the tested SDK 0.2.1-rc.2 and Cordis 4.0.5.
+- Tests updated: queued messages must contain zero `user`-sourced review text, and parameter text cannot invoke unrelated skills through the gesture scanner.
+
 ## 1.2.1
 
 - Support DSH 0.2.1-rc.1. The plugin now declares its own `engines.dsh` range (`^0.2.0-rc.2`) so the DSH loader accepts both the 0.2.0-rc.2 and 0.2.1 prerelease runtimes instead of skipping the bundle for exact SDK peer pins.

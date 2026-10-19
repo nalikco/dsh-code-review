@@ -1,8 +1,8 @@
 {
   "name": "dsh-code-review",
-  "version": "1.2.1",
+  "version": "1.2.2",
   "private": true,
-  "description": "A native code-review skill for DeepSeek Harness with a short slash invocation and optional fixes.",
+  "description": "A native code-review skill for DeepSeek Harness with a slash invocation and optional fixes.",
   "type": "module",
   "license": "MIT",
   "author": "Igor Karpliuk",
@@ -29,11 +29,10 @@
   },
   "dsh": { "bundle": { "patch": "./cordis.patch.yml" } },
   "peerDependencies": {
-    "@deepseek-ai/cordis": "~4.0.4",
-    "@deepseek-ai/dsh-commands": "0.2.0-rc.2 || 0.2.1-rc.1",
-    "@deepseek-ai/dsh-llm": "0.2.0-rc.2 || 0.2.1-rc.1",
-    "@deepseek-ai/dsh-skill": "0.2.0-rc.2 || 0.2.1-rc.1",
-    "@deepseek-ai/dsh-tool-skill": "0.2.0-rc.2 || 0.2.1-rc.1"
+    "@deepseek-ai/cordis": "~4.0.4 || ~4.0.5",
+    "@deepseek-ai/dsh-commands": "0.2.0-rc.2 || 0.2.1-rc.1 || 0.2.1-rc.2",
+    "@deepseek-ai/dsh-llm": "0.2.0-rc.2 || 0.2.1-rc.1 || 0.2.1-rc.2",
+    "@deepseek-ai/dsh-skill": "0.2.0-rc.2 || 0.2.1-rc.1 || 0.2.1-rc.2"
   },
   "devDependencies": {
     "@deepseek-ai/dsh-agent": "0.2.1-rc.1",
@@ -42,6 +41,7 @@
     "@deepseek-ai/dsh-session": "0.2.1-rc.1",
     "@deepseek-ai/dsh-session-projection": "0.2.1-rc.1",
     "@deepseek-ai/dsh-system-prompt": "0.2.1-rc.1",
+    "@deepseek-ai/dsh-tool-skill": "0.2.1-rc.1",
     "@deepseek-ai/dsh-tools": "0.2.1-rc.1",
     "@deepseek-ai/dsh-working-directory": "0.2.1-rc.1"
   }

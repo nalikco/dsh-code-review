@@ -38,12 +38,13 @@ test('plugin registers command and explicit-only native skill', () => {
   const f = fixture(); assert.deepEqual(inject, ['commands', 'skills']); assert.equal(f.definition.name, 'code-review');
   assert.deepEqual(f.registered, [skill]); assert.equal(skill.name, SKILL_NAME); assert.deepEqual(skill.invocation, { userInvocable: true, modelInvocable: false });
 });
-test('default queues short skill invocation, never the full instructions', () => {
+test('default queues full skill instructions with skill-invocation source, nothing attributed to the user', () => {
   const f = fixture(), result = f.invoke(); assert.equal(result.kind, 'success'); assert.equal(f.messages.length, 1);
   const message = f.messages[0], text = message.content[0].text;
-  assert.equal(message.role, 'user'); assert.match(text, /^\/dsh-code-review\n/); assert.match(text, /ANALYSIS ONLY/);
-  assert.doesNotMatch(text, /Correctness and security|Reuse and code quality/); assert.ok(text.length < 500);
-  assert.match(skill.content, /three independent read-only reviews in parallel/); assert.match(skill.content, /If delegation is unavailable or disallowed/);
+  assert.equal(message.role, 'user');
+  assert.deepEqual(message.source, { kind: 'skill-invocation', name: SKILL_NAME, form: 'instructions' });
+  assert.match(text, /^<skill_content name="dsh-code-review">/); assert.match(text, /ANALYSIS ONLY/);
+  assert.match(text, /Correctness and security|Reuse and code quality/); assert.match(text, /three independent read-only reviews in parallel/);
 });
 test('fix is explicit and parameters remain literal prompt data', () => {
   const f = fixture(); f.invoke('--fix --base "main; echo unsafe" --focus "timeout handling"');
@@ -67,7 +68,7 @@ test('parameter slashes cannot accidentally invoke other native skills', () => {
   const focus = 'check /other-skill and /etc/config', base = 'feature/topic';
   const text = buildInvocation({ fix: false, focus, base });
   const gestures = [...text.matchAll(/(^|\s)\/([a-z0-9]+(?:-[a-z0-9]+)*)(?=\s|$)/g)].map(m => m[2]);
-  assert.deepEqual(gestures, [SKILL_NAME]);
+  assert.deepEqual(gestures, []);
   assert.equal(JSON.parse(text.split('Additional focus (JSON string): ')[1].trim()), focus);
   assert.equal(JSON.parse(text.split('Base ref (JSON string): ')[1].split('\n')[0]), base);
 });

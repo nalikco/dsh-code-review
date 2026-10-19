@@ -2,7 +2,7 @@
 
 English | [Русский](README.ru.md)
 
-Version **1.2.1**, [MIT](LICENSE). A small `/code-review` command backed by a **native DSH skill**, combining correctness/security, reuse/quality and efficiency.
+Version **1.2.2**, [MIT](LICENSE). A small `/code-review` command backed by a **native DSH skill**, combining correctness/security, reuse/quality and efficiency.
 
 ```text
 /code-review
@@ -14,9 +14,9 @@ Version **1.2.1**, [MIT](LICENSE). A small `/code-review` command backed by a **
 
 ## Native skill, not a pasted user prompt
 
-The plugin registers [REVIEW_PROMPT.md](REVIEW_PROMPT.md) as the explicit-only `dsh-code-review` skill. The command queues a **short** user invocation with mode/base/focus. The standard `dsh-tool-skill` adapter recognizes `/dsh-code-review` and injects the full instructions with `source.kind: skill-invocation`, not as text attributed to the user.
+The plugin registers [REVIEW_PROMPT.md](REVIEW_PROMPT.md) as the explicit-only `dsh-code-review` skill. The command queues **one** message that carries the full rendered `<skill_content>` instructions plus the mode/base/focus parameters, and it is stamped `source.kind: 'skill-invocation'`. Nothing is attributed to the user: Chat shows a native skill-invocation chip, not a bubble that looks like human input, and no `user`-sourced review text ever enters the session.
 
-The model still receives the instructions as user-role skill context. The current DSH Chat handles this as native skill context rather than a long human bubble; exact presentation depends on the DSH version. The plugin adds no custom UI renderer. It does not move the rules into a persistent system prompt or add another review engine.
+Because the instructions travel inside the queued message, the standard `dsh-tool-skill` gesture scanner is not involved, and a queued review still runs with its instructions even if the plugin is unloaded afterwards.
 
 The agent uses normal DSH tools to inspect diffs and project instructions, run three review directions through available subagents, validate findings and report. If delegation is unavailable, the skill asks for three passes in the current agent with the limitation disclosed. The skill is user-invocable but not automatically model-invocable, so merely installing it does not start reviews.
 
@@ -30,9 +30,9 @@ The agent uses normal DSH tools to inspect diffs and project instructions, run t
 | `--focus "text"` | Additional topic; quote values containing spaces or starting with flags. |
 | `--help` | Help without waking the agent. |
 
-Quotes group values without shell expansion. Regex/path backslashes are preserved; `\"` and `\\` escape quotes/backslashes inside double quotes. Parameters use JSON; slashes are escaped as `\u002f` so focus text cannot accidentally invoke another skill. Composer attachments are not accepted.
+Quotes group values without shell expansion. Regex/path backslashes are preserved; `\"` and `\\` escape quotes/backslashes inside double quotes. Parameters use JSON; slashes are escaped as `\u002f` so copied invocation text cannot accidentally invoke another skill. Composer attachments are not accepted.
 
-Command success means **queued**, not finished or even loaded yet. A busy agent finishes its current turn first. Use ordinary DSH queue/turn controls after handoff. **Keep the plugin enabled until skill loading occurs.** Disabling it removes the command and skill, but not accepted queue messages; a queued invocation then lacks its instructions and asks the agent to stop/report that limitation. Already injected instructions remain in session history.
+Command success means **queued**, not finished. A busy agent finishes its current turn first. Use ordinary DSH queue/turn controls after handoff. A queued invocation carries its own instructions, so disabling or uninstalling the plugin afterwards does not invalidate work already in the queue.
 
 ## Installation
 
@@ -44,9 +44,9 @@ https://github.com/nalikco/dsh-code-review.git
 
 Pin a reviewed commit using `#<commit-sha>` or install a local clone by absolute path. Inspect installation status; `restart-required` requires restart. Publishing Git changes does not update an installed profile automatically.
 
-Requires Node22+, DSH0.2.1-rc.1/Cordis~4.0.5, services `commands` and `skills`, and an **active native `dsh-tool-skill` adapter in the agent composition**. Installing an npm peer package alone does not activate that adapter. If skills are disabled in your preset, enable the shipped skill capability there before using this command.
+Requires Node22+, DSH0.2.1-rc.2 (0.2.0-rc.2/0.2.1-rc.1 peers retained), Cordis~4.0.5 and services `commands` and `skills`. No plugin settings/build/install scripts. `private:true` prevents accidental npm publication, not Git/local installation. Uninstall through Plugin Manager.
 
-Do not register another global `code-review` command or any project/user/preset skill named `dsh-code-review`: normal registry precedence can override the bundled skill. No plugin settings/build/install scripts. `private:true` prevents accidental npm publication, not Git/local installation. Uninstall through Plugin Manager.
+Do not register another global `code-review` command or any project/user/preset skill named `dsh-code-review`: a conflicting registration would shadow the skill and confuse the native gesture when `/dsh-code-review` is typed directly.
 
 ## Deliberately small
 
@@ -62,6 +62,6 @@ npm run test:all
 npm run test:package
 ```
 
-Tests verify short user invocation versus full `skill-invocation` instructions, native gesture loading, argument preservation, busy queue/cancellation/unload and the packed artifact. Scripted adapters do not establish live-model accuracy or live GUI rendering. See [CONTRIBUTING.md](CONTRIBUTING.md), [CHANGELOG.md](CHANGELOG.md).
+Tests verify that queued invocations are `skill-invocation`-sourced with zero `user`-attributed text, carry full instructions plus parameters, preserve arguments, and cover busy queue/cancellation/unload plus the packed artifact. Scripted adapters do not establish live-model accuracy or live GUI rendering. See [CONTRIBUTING.md](CONTRIBUTING.md), [CHANGELOG.md](CHANGELOG.md).
 
 Inspired by the [official code-review plugin](https://github.com/anthropics/claude-code/blob/main/plugins/code-review/commands/code-review.md) and [published Simplify prompt](https://github.com/dsdanielpark/claude-code-system-prompts/blob/main/system-prompts/skill-simplify.md). Independent implementation, not affiliated with Anthropic.

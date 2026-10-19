@@ -61,9 +61,10 @@ test('actual slash command delivers prompt into existing normal model turn', asy
   const messages = f.agent.session.snapshotEvents().filter(event => event.type === 'user/message').map(event => event.data);
   const human = messages.filter(message => message.source.kind === 'user');
   const loaded = messages.filter(message => message.source.kind === 'skill-invocation');
-  assert.equal(human.length, 1); assert.doesNotMatch(human[0].content[0].text, /Code Review: correctness/);
+  assert.equal(human.length, 0, 'nothing may be attributed to the user');
   assert.equal(loaded.length, 1); assert.deepEqual(loaded[0].source, { kind: 'skill-invocation', name: SKILL_NAME, form: 'instructions' });
   assert.match(loaded[0].content[0].text, /<skill_content/); assert.match(loaded[0].content[0].text, /Code Review: correctness/);
+  assert.match(loaded[0].content[0].text, /ANALYSIS ONLY/); assert.match(loaded[0].content[0].text, /Base ref \(JSON string\): "main"/);
 });
 test('help does not model-call and unload removes slash registration', async t => {
   const f = await host(t);
@@ -96,7 +97,7 @@ test('invalid input and unsupported attachment do not start an agent turn', asyn
   const result = await f.ctx.commands.execute(f.agent, '/code-review', [{ type: 'image', data: 'invalid', mimeType: 'image/png' }], signal);
   assert.equal(result.result.kind, 'error'); assert.match(result.result.text, /does not accept attachments/); assert.equal(f.adapter.requests.length, 0);
 });
-test('unload before queued skill lookup preserves queue but makes skill unavailable', async t => {
+test('queued review survives plugin unload with its own embedded instructions', async t => {
   const f = await host(t), started = Promise.withResolvers(), release = Promise.withResolvers();
   f.adapter.beforeResponse = async (_request, count) => { if (count === 1) { started.resolve(); await release.promise; } };
   t.after(() => release.resolve());
@@ -106,9 +107,10 @@ test('unload before queued skill lookup preserves queue but makes skill unavaila
   await f.fiber.dispose(); release.resolve(); await f.agent.whenIdle();
   assert.equal(f.ctx.commands.find(f.agent, 'code-review'), undefined); assert.equal(await f.ctx.skills.get(SKILL_NAME), undefined); assert.equal(f.adapter.requests.length, 3);
   const events = f.agent.session.snapshotEvents(); assert.equal(events.filter(e => e.type === 'turn/end').length, 3);
-  assert.equal(events.filter(e => e.type === 'user/message' && e.data.source.kind === 'skill-invocation').length, 0);
+  const reviews = events.filter(e => e.type === 'user/message' && e.data.source.kind === 'skill-invocation');
+  assert.equal(reviews.length, 1); assert.deepEqual(reviews[0].data.source, { kind: 'skill-invocation', name: SKILL_NAME, form: 'instructions' });
   const text = f.adapter.requests[1].messages.flatMap(m => m.content ?? []).filter(b => b.type === 'text').map(b => b.text).join('\n');
-  assert.match(text, /if they are missing, stop/);
+  assert.match(text, /ANALYSIS ONLY/); assert.match(text, /Code Review: correctness/);
 });
 test('normal parent tool deny remains authoritative after prompt handoff', async t => {
   const f = await host(t); let executed = false;
@@ -131,14 +133,17 @@ test('focus slash tokens do not load unrelated skills', async t => {
   await f.ctx.commands.execute(f.agent, '/code-review --focus "check /other-skill and /etc/config"', [], new AbortController().signal); await f.agent.whenIdle();
   const injections = f.agent.session.snapshotEvents().filter(e => e.type === 'user/message' && e.data.source.kind === 'skill-invocation');
   assert.deepEqual(injections.map(e => e.data.source.name), [SKILL_NAME]);
+  const text = f.adapter.requests[0].messages.flatMap(m => m.content ?? []).filter(b => b.type === 'text').map(b => b.text).join('\n');
+  assert.doesNotMatch(text, /UNRELATED INSTRUCTIONS/);
 });
-test('each queued review loads skill with its own mode, without custom run state', async t => {
+test('each queued review carries its own mode, without custom run state', async t => {
   const f = await host(t);
   await f.ctx.commands.execute(f.agent, '/code-review --focus "first"', [], new AbortController().signal);
   await f.ctx.commands.execute(f.agent, '/code-review --fix --focus "second"', [], new AbortController().signal);
   await f.agent.whenIdle(); assert.equal(f.adapter.requests.length, 2);
   const messages = f.agent.session.snapshotEvents().filter(e => e.type === 'user/message').map(e => e.data);
   assert.equal(messages.filter(m => m.source.kind === 'skill-invocation').length, 2);
-  const requests = messages.filter(m => m.source.kind === 'user').map(m => m.content[0].text);
+  assert.equal(messages.filter(m => m.source.kind === 'user').length, 0, 'nothing may be attributed to the user');
+  const requests = messages.filter(m => m.source.kind === 'skill-invocation').map(m => m.content[0].text);
   assert.match(requests[0], /ANALYSIS ONLY/); assert.match(requests[0], /first/); assert.match(requests[1], /Mode: FIX/); assert.match(requests[1], /second/);
 });
