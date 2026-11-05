@@ -1,6 +1,6 @@
 {
   "name": "dsh-code-review",
-  "version": "1.3.0",
+  "version": "1.3.1",
   "private": true,
   "description": "A native code-review skill for DeepSeek Harness with a slash invocation and optional fixes.",
   "type": "module",

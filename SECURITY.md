@@ -4,7 +4,7 @@ Report vulnerabilities through [GitHub private vulnerability reporting](https://
 
 This is installed host code: review the package and pin a trusted commit. The plugin registers a bundled native skill, parses command arguments and queues one invocation message on the current agent. The message is stamped `source.kind: 'skill-invocation'` and carries the full rendered instructions, so nothing is attributed to the user and the queued review keeps its instructions across plugin unload. It does not execute Git/shell, inspect the workspace, change permissions, create subagents itself or write source files.
 
-The **agent** may use its normal tools, read source code, delegate and edit files. DSH owns sandbox, Auto review, approvals, plan mode and cancellation. The prompt asks for no source edits by default and permits fixes only with `--fix`, but this is **not a hard read-only guarantee**. There is no additional plugin guard or safety gate. A model can misinterpret instructions or produce an incorrect fix, and prompt injection remains possible.
+The **agent** may use its normal tools, read source code, delegate and edit files. DSH owns sandbox, Auto review, approvals, plan mode and cancellation. The prompt always asks the agent to apply confirmed fixes; there is **no read-only mode**. There is no additional plugin guard or safety gate. A model can misinterpret instructions or produce an incorrect fix, and prompt injection remains possible.
 
 Source and tool results may reach the session's configured LLM provider and persist in ordinary DSH storage. This plugin adds no telemetry endpoint or separate provider. Use only with data you are authorized to send to that provider.
 

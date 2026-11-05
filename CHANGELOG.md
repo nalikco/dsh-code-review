@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.3.1
+
+- The `--fix` flag is removed: the skill now always applies confirmed fixes (never commit/push/deploy).
+- Subagent delegation has a threshold (more than ~5 files or ~300 lines) and a self-contained brief; one read-only reviewer by default, one per direction only for far larger changes. The agent alone validates findings, fixes and runs checks.
+- The skill reads `--base`, `--focus` and `--help` itself and looks for the intended repository when the current directory is not a Git repo.
+
 ## 1.3.0
 
 - The `/code-review` slash command is removed; the plugin registers only the native skill, so it no longer appears twice in the `/` menu.

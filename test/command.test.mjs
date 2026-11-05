@@ -10,11 +10,11 @@ function fixture() {
   return { registered };
 }
 for (const [input, expected] of [
-  ['', { fix: false, base: null, focus: '', help: false }],
-  [' --fix --base main --focus "memory leaks"', { fix: true, base: 'main', focus: 'memory leaks', help: false }],
-  ["--focus 'a b' --help", { fix: false, base: null, focus: 'a b', help: true }],
+  ['', { base: null, focus: '', help: false }],
+  [' --base main --focus "memory leaks"', { base: 'main', focus: 'memory leaks', help: false }],
+  ["--focus 'a b' --help", { base: null, focus: 'a b', help: true }],
 ]) test(`parse ${input || 'default'}`, () => assert.deepEqual(parseOptions(input), expected));
-for (const input of ['--fix --fix', '--unknown', '--base', '--base -x', '--focus "x', '--base "a\nb"', '--focus \\']) test(`reject ${JSON.stringify(input)}`, () => assert.throws(() => parseOptions(input)));
+for (const input of ['--fix', '--base m --base m', '--unknown', '--base', '--base -x', '--focus "x', '--base "a\nb"', '--focus \\']) test(`reject ${JSON.stringify(input)}`, () => assert.throws(() => parseOptions(input)));
 test('quoted and unquoted focus preserve literal regex/path backslashes', () => {
   const value = String.raw`regex \d+ and C:\temp`;
   assert.equal(parseOptions(`--focus "${value}"`).focus, value);
@@ -27,19 +27,19 @@ test('escapes handle quotes, spaces and doubled backslashes without shell expans
   assert.equal(parseOptions('--focus "$(echo test)"').focus, '$(echo test)');
 });
 test('explicitly quoted focus may start with flags, missing bare values still fail', () => {
-  assert.equal(parseOptions('--focus "--fix behavior"').focus, '--fix behavior');
+  assert.equal(parseOptions('--focus "--help behavior"').focus, '--help behavior');
   assert.equal(parseOptions("--focus '--help'").focus, '--help');
-  assert.throws(() => parseOptions('--focus --fix'), /Некорректное значение/);
+  assert.throws(() => parseOptions('--focus --help'), /Некорректное значение/);
   assert.throws(() => parseOptions('--base "--help"'), /git ref/);
 });
 test('plugin registers only explicit-only native skill, no slash command', () => {
   const f = fixture(); assert.deepEqual(inject, ['skills']);
   assert.deepEqual(f.registered, [skill]); assert.equal(skill.name, SKILL_NAME); assert.deepEqual(skill.invocation, { userInvocable: true, modelInvocable: true });
 });
-test('fix is explicit and parameters remain literal prompt data', () => {
-  const text = buildInvocation({ fix: true, base: 'main; echo unsafe', focus: 'timeout handling' });
+test('fix mode is always on and parameters remain literal prompt data', () => {
+  const text = buildInvocation({ base: 'main; echo unsafe', focus: 'timeout handling' });
   assert.match(text, /Mode: FIX/); assert.match(text, /Base ref \(JSON string\): "main; echo unsafe"/); assert.match(text, /timeout handling/);
-  assert.match(skill.content, /not authorization for commit, push/);
+  assert.match(skill.content, /does not authorize commit, push/);
 });
 test('review prompt does not require engine JSON output or hardcoded providers', () => {
   const text = skill.content;
@@ -48,7 +48,7 @@ test('review prompt does not require engine JSON output or hardcoded providers',
 });
 test('parameter slashes cannot accidentally invoke other native skills', () => {
   const focus = 'check /other-skill and /etc/config', base = 'feature/topic';
-  const text = buildInvocation({ fix: false, focus, base });
+  const text = buildInvocation({ focus, base });
   const gestures = [...text.matchAll(/(^|\s)\/([a-z0-9]+(?:-[a-z0-9]+)*)(?=\s|$)/g)].map(m => m[2]);
   assert.deepEqual(gestures, []);
   assert.equal(JSON.parse(text.split('Additional focus (JSON string): ')[1].trim()), focus);

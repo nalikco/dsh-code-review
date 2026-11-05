@@ -1,17 +1,15 @@
-export const HELP = `/code-review [--fix] [--base <ref>] [--focus <text>]
+export const HELP = `/code-review [--base <ref>] [--focus <text>]
 
 Ставит вызов skill dsh-code-review в обычную очередь текущего агента.
 Сообщение помечено source kind 'skill-invocation' и уже содержит полные инструкции skill:
 в чате оно не отображается как текст пользователя, штатный dsh-tool-skill не требуется.
-По умолчанию промпт просит только анализ, без правок исходников.
---fix: просит проверить находки и исправить подтверждённые проблемы штатными инструментами.
+Всегда: проверить находки и исправить подтверждённые проблемы штатными инструментами.
 --base <ref>: изменения относительно merge-base указанной ветки с HEAD.
 --focus <text>: дополнительный фокус, несколько слов заключай в кавычки.
 --help: справка без запуска агента.
 
 Три направления: корректность/безопасность, переиспользование/качество, эффективность.
 Плагин не вводит собственную песочницу, лимит diff или механизм исправлений.
-Режим без правок является инструкцией в промпте, а не жёстким read-only ограничением.
 Права, подтверждения, отмена, инструменты и subagents управляются самим DSH.
 Commit, push, deploy и публикация комментариев не разрешаются этой командой.`;
 
@@ -38,14 +36,13 @@ function tokenize(input) {
 
 export function parseOptions(input = '') {
   if (input.length > 8000) throw new Error('Слишком длинные аргументы.');
-  const tokens = tokenize(input), result = { fix: false, base: null, focus: '', help: false }, seen = new Set();
+  const tokens = tokenize(input), result = { base: null, focus: '', help: false }, seen = new Set();
   for (let i = 0; i < tokens.length; i++) {
     const flag = tokens[i].value;
-    if (!['--fix', '--base', '--focus', '--help'].includes(flag)) throw new Error(`Неизвестный аргумент: ${flag}. Используй /code-review --help.`);
+    if (!['--base', '--focus', '--help'].includes(flag)) throw new Error(`Неизвестный аргумент: ${flag}. Используй /code-review --help.`);
     if (seen.has(flag)) throw new Error(`Повторный аргумент: ${flag}`);
     seen.add(flag);
-    if (flag === '--fix') result.fix = true;
-    else if (flag === '--help') result.help = true;
+    if (flag === '--help') result.help = true;
     else {
       const token = tokens[++i], value = token?.value;
       if (!value || (value.startsWith('--') && !token.quoted) || /[\x00-\x1f\x7f]/u.test(value)) throw new Error(`Некорректное значение ${flag}.`);

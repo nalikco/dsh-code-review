@@ -6,7 +6,6 @@ Version **1.2.2**, [MIT](LICENSE). A small `/code-review` command backed by a **
 
 ```text
 /code-review
-/code-review --fix
 /code-review --base main
 /code-review --focus "error handling"
 /code-review --help
@@ -20,12 +19,11 @@ Because the instructions travel inside the queued message, the standard `dsh-too
 
 The agent uses normal DSH tools to inspect diffs and project instructions, run three review passes itself (subagents only for large changes, to save tokens), validate findings and report. The skill is invocable both by the user and by the model.
 
-**Analysis-only is a prompt instruction, not a hard read-only sandbox.** `--fix` asks for confirmed fixes/local simplifications, final-diff inspection and relevant available checks. No commit, push, deploy or public comments are authorized. DSH owns model, tools, permissions, approvals, plan mode, cancellation and subagents.
+**Fix mode is always on (prompt instruction, not a hard guarantee).** The agent asks for confirmed fixes/local simplifications, final-diff inspection and relevant available checks. No commit, push, deploy or public comments are authorized. DSH owns model, tools, permissions, approvals, plan mode, cancellation and subagents.
 
 | Option | Meaning |
 | --- | --- |
-| Default | Review without source edits; staged/unstaged separately plus relevant untracked source files. |
-| `--fix` | Ask for confirmed fixes through ordinary session tools after review. |
+| Default | Review, then apply confirmed fixes through ordinary session tools; staged/unstaged separately plus relevant untracked source files. |
 | `--base <ref>` | Review relative to merge-base of ref/HEAD, including working-tree changes. |
 | `--focus "text"` | Additional topic; quote values containing spaces or starting with flags. |
 | `--help` | Help without waking the agent. |
@@ -50,7 +48,7 @@ Do not register another global `code-review` command or any project/user/preset 
 
 ## Deliberately small
 
-No custom Git collector, duplicated snapshots, diff-size limit/batching, finding JSON protocol, provider routing, child lifecycle management, guards or fix scheduler. The agent chooses context under ordinary DSH/model limits. Old engine settings are unused. Like an ordinary skill, validation and analysis-only behavior depend on the model, not plugin enforcement.
+No custom Git collector, duplicated snapshots, diff-size limit/batching, finding JSON protocol, provider routing, child lifecycle management, guards or fix scheduler. The agent chooses context under ordinary DSH/model limits. Old engine settings are unused. Like an ordinary skill, validation and fix behavior depend on the model, not plugin enforcement.
 
 Source and tool results may reach the configured LLM provider and persist in DSH storage. Use authorized data only. No telemetry endpoint or separate provider. See [SECURITY.md](SECURITY.md).
 

@@ -5,7 +5,7 @@ export const SKILL_NAME = 'code-review';
 export const skill = {
   name: SKILL_NAME,
   provider: 'dsh-code-review',
-  description: 'Review changes for correctness, reuse and efficiency; optionally apply confirmed fixes.',
+  description: 'Review changes for correctness, reuse and efficiency; apply confirmed fixes.',
   content: readFileSync(new URL('./REVIEW_PROMPT.md', import.meta.url), 'utf8'),
   source: 'dsh-code-review',
   invocation: { userInvocable: true, modelInvocable: true },
@@ -24,7 +24,7 @@ export function invocationSource() {
 export function buildInvocation(options) {
   return `${renderSkillContent(skill)}
 Invocation parameters:
-Mode: ${options.fix ? 'FIX. Review first, then apply confirmed fixes using ordinary session tools.' : 'ANALYSIS ONLY. Do not edit source files.'}
+Mode: FIX. Review first, then apply confirmed fixes using ordinary session tools.
 Base ref (JSON string): ${parameter(options.base)}
 Additional focus (JSON string): ${parameter(options.focus)}
 `;
