@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.4.0
+
+- Limit review to changes attributable to the current session, including when `--base` is supplied; report attribution gaps instead of reviewing unrelated changes.
+- Refresh the plugin icon to match the DSH visual style.
+
 ## 1.3.1
 
 - The `--fix` flag is removed: the skill now always applies confirmed fixes (never commit/push/deploy).

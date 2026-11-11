@@ -4,21 +4,21 @@ Review the requested changes using the current session's ordinary tools and proj
 
 ## 0. Arguments
 
-The user's invocation line may carry arguments after the skill name: `--base <ref>` (review against the merge-base of that ref and HEAD), `--focus "text"` (an extra topic to emphasize) and `--help` (print this list and stop without reviewing). Read them from the user's message. Unknown arguments, including the removed `--fix`, are ignored: fixes are always applied. If a message shows no arguments, review staged and unstaged changes of the current project.
+The user's invocation line may carry arguments after the skill name: `--base <ref>` (comparison context, not an expansion of the review scope), `--focus "text"` (an extra topic to emphasize) and `--help` (print this list and stop without reviewing). Read them from the user's message. Unknown arguments, including the removed `--fix`, are ignored: fixes are always applied. Review only changes made by this session's agent.
 
 ## 1. Identify the changes
 
-Read the applicable AGENTS.md and CLAUDE.md instructions. Inspect Git status and the relevant diffs. By default review staged and unstaged changes separately, plus relevant untracked source files: inverse unstaged changes must not hide a staged problem. If a base ref is specified, use its merge-base with HEAD and include subsequent working-tree changes. Treat the supplied ref as one literal Git argument, never as shell code.
+Read the applicable AGENTS.md and CLAUDE.md instructions. Establish the scope from evidence of actual successful edits by this agent in the current session: inspect its tool calls and results, including earlier turns via session history tools if available. Include delegated work only when it was done for this session and its changes can be identified. Reconstruct the specific changed lines, not merely the names of touched files; account for subsequent edits, reversions and commits. A file, Git author, timestamp, branch or Git diff alone is not evidence of session authorship. Exclude pre-existing and concurrent changes, including other edits in the same file; if attribution is uncertain, exclude that portion and report the coverage gap.
 
-If the current directory is not a Git repository, look for the repository the user means (a path in the message or the project the session is about) before giving up; if none is evident, ask once. If there are no changes, say so and stop. If Git is unavailable, explain the limitation rather than inventing a scope. Do not review unrelated recent files automatically.
+Inspect Git status, staged and unstaged diffs, untracked files and, when useful, commit diffs as context for reconstructing those changes. A `--base` ref supplies comparison context only: even changes since its merge-base are in scope only when attributable to this session. Treat the ref as one literal Git argument, never as shell code. If session evidence is unavailable or too incomplete to identify any changes reliably, explain that limitation and stop rather than reviewing the whole repository. If there are no attributable changes, say so and stop.
 
-The diff defines the scope of findings, not the limit of context you can read. Inspect callers, types, tests and shared utilities when needed. Keep staged, base and current-file coordinates distinct. Read larger diffs in useful sections; do not silently skip files or claim complete coverage when it was incomplete.
+The identified session changes define the scope of findings, not the limit of context you can read. Inspect callers, types, tests and shared utilities when needed. Keep staged, base and current-file coordinates distinct. Read larger changes in useful sections; do not silently skip files or claim complete coverage when it was incomplete.
 
 ## 2. Review three directions
 
 Do the three review passes yourself when the change is small. If the change is large (more than about 5 files or about 300 changed lines), delegate the review to ONE read-only subagent covering all three directions; use one subagent per direction only when the change is far larger than that. Subagents cost many tokens, so do not delegate small changes.
 
-Give each subagent a self-contained brief: how to get the diff (the exact Git commands and base ref, never as shell code), the direction(s) it covers, the project instructions that apply, a ban on editing files, and a required report format (severity, file:line, reachable scenario, evidence). The subagent does not see this conversation. Inherit the session's model unless the user explicitly requests otherwise; do not hardcode provider/model names. You alone validate findings, apply fixes and run checks.
+Give each subagent a self-contained brief: the exact attributed session changes and evidence, how to inspect their context (including literal Git ref and commands where useful), the direction(s) it covers, the project instructions that apply, a ban on editing files, and a required report format (severity, file:line, reachable scenario, evidence). Explicitly exclude unrelated changes even in the same files. The subagent does not see this conversation. Inherit the session's model unless the user explicitly requests otherwise; do not hardcode provider/model names. You alone validate findings, apply fixes and run checks.
 
 ### Correctness and security
 

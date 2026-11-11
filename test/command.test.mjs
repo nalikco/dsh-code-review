@@ -41,6 +41,14 @@ test('fix mode is always on and parameters remain literal prompt data', () => {
   assert.match(text, /Mode: FIX/); assert.match(text, /Base ref \(JSON string\): "main; echo unsafe"/); assert.match(text, /timeout handling/);
   assert.match(skill.content, /does not authorize commit, push/);
 });
+test('session evidence bounds review, even for mixed files and a base ref', () => {
+  const text = skill.content;
+  assert.match(text, /specific changed lines, not merely the names of touched files/);
+  assert.match(text, /Exclude pre-existing and concurrent changes, including other edits in the same file/);
+  assert.match(text, /`--base` ref supplies comparison context only/);
+  assert.match(text, /session evidence is unavailable or too incomplete[\s\S]*stop rather than reviewing the whole repository/);
+  assert.match(text, /exact attributed session changes and evidence/);
+});
 test('review prompt does not require engine JSON output or hardcoded providers', () => {
   const text = skill.content;
   assert.doesNotMatch(text, /submit_review|structured_output|claude-opus|maxDiffBytes/);

@@ -2,7 +2,7 @@
 
 English | [Русский](README.ru.md)
 
-Version **1.2.2**, [MIT](LICENSE). A small `/code-review` command backed by a **native DSH skill**, combining correctness/security, reuse/quality and efficiency.
+Version **1.4.0**, [MIT](LICENSE). A small `/code-review` command backed by a **native DSH skill**, combining correctness/security, reuse/quality and efficiency.
 
 ```text
 /code-review
@@ -17,14 +17,16 @@ The plugin registers [REVIEW_PROMPT.md](REVIEW_PROMPT.md) as the explicit-only `
 
 Because the instructions travel inside the queued message, the standard `dsh-tool-skill` gesture scanner is not involved, and a queued review still runs with its instructions even if the plugin is unloaded afterwards.
 
-The agent uses normal DSH tools to inspect diffs and project instructions, run three review passes itself (subagents only for large changes, to save tokens), validate findings and report. The skill is invocable both by the user and by the model.
+By default, the review covers only changes made by the agent in the current session. Session history provides evidence for attribution; Git diffs provide context, not proof of authorship. Changes whose attribution is uncertain are excluded. This is best effort: external changes and changes made through Bash cannot be attributed precisely.
+
+The agent uses normal DSH tools to inspect session history, diffs and project instructions, run three review passes itself (subagents only for large changes, to save tokens), validate findings and report. The skill is invocable both by the user and by the model.
 
 **Fix mode is always on (prompt instruction, not a hard guarantee).** The agent asks for confirmed fixes/local simplifications, final-diff inspection and relevant available checks. No commit, push, deploy or public comments are authorized. DSH owns model, tools, permissions, approvals, plan mode, cancellation and subagents.
 
 | Option | Meaning |
 | --- | --- |
-| Default | Review, then apply confirmed fixes through ordinary session tools; staged/unstaged separately plus relevant untracked source files. |
-| `--base <ref>` | Review relative to merge-base of ref/HEAD, including working-tree changes. |
+| Default | Review the current session's agent changes, then apply confirmed fixes through ordinary session tools. |
+| `--base <ref>` | Use the merge-base of ref/HEAD as diff context; it does not expand the review scope beyond the current session's agent changes. |
 | `--focus "text"` | Additional topic; quote values containing spaces or starting with flags. |
 | `--help` | Help without waking the agent. |
 
