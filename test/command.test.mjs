@@ -43,11 +43,13 @@ test('fix mode is always on and parameters remain literal prompt data', () => {
 });
 test('session evidence bounds review, even for mixed files and a base ref', () => {
   const text = skill.content;
-  assert.match(text, /specific changed lines, not merely the names of touched files/);
+  assert.match(text, /specific changed lines, not merely touched file names/);
   assert.match(text, /Exclude pre-existing and concurrent changes, including other edits in the same file/);
-  assert.match(text, /`--base` ref supplies comparison context only/);
-  assert.match(text, /session evidence is unavailable or too incomplete[\s\S]*stop rather than reviewing the whole repository/);
-  assert.match(text, /exact attributed session changes and evidence/);
+  assert.match(text, /Session changes exist:[\s\S]*review only those attributable changes/);
+  assert.match(text, /The session made no changes[\s\S]*review all staged and unstaged changes separately plus relevant untracked source files/);
+  assert.match(text, /`--base` is supplied[\s\S]*merge-base of the ref and HEAD together with working-tree changes/);
+  assert.match(text, /session history is unavailable or incomplete[\s\S]*do not treat uncertainty as proof of an empty session/);
+  assert.match(text, /selected scope and evidence/);
 });
 test('review prompt does not require engine JSON output or hardcoded providers', () => {
   const text = skill.content;

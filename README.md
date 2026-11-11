@@ -2,7 +2,7 @@
 
 English | [Русский](README.ru.md)
 
-Version **1.4.0**, [MIT](LICENSE). A small `/code-review` command backed by a **native DSH skill**, combining correctness/security, reuse/quality and efficiency.
+Version **1.4.1**, [MIT](LICENSE). A small `/code-review` command backed by a **native DSH skill**, combining correctness/security, reuse/quality and efficiency.
 
 ```text
 /code-review
@@ -17,7 +17,7 @@ The plugin registers [REVIEW_PROMPT.md](REVIEW_PROMPT.md) as the explicit-only `
 
 Because the instructions travel inside the queued message, the standard `dsh-tool-skill` gesture scanner is not involved, and a queued review still runs with its instructions even if the plugin is unloaded afterwards.
 
-By default, the review covers only changes made by the agent in the current session. Session history provides evidence for attribution; Git diffs provide context, not proof of authorship. Changes whose attribution is uncertain are excluded. This is best effort: external changes and changes made through Bash cannot be attributed precisely.
+When the agent has made changes in the current session, review covers only those changes, using session history as evidence and excluding uncertain attribution. If the session made no changes (for example, a new review-only session), review covers all staged and unstaged changes plus relevant untracked files. If incomplete history makes it unclear whether session changes exist, review stops rather than silently expanding its scope. Attribution is best effort: external changes and changes made through Bash cannot always be identified precisely.
 
 The agent uses normal DSH tools to inspect session history, diffs and project instructions, run three review passes itself (subagents only for large changes, to save tokens), validate findings and report. The skill is invocable both by the user and by the model.
 
@@ -25,8 +25,8 @@ The agent uses normal DSH tools to inspect session history, diffs and project in
 
 | Option | Meaning |
 | --- | --- |
-| Default | Review the current session's agent changes, then apply confirmed fixes through ordinary session tools. |
-| `--base <ref>` | Use the merge-base of ref/HEAD as diff context; it does not expand the review scope beyond the current session's agent changes. |
+| Default | Review the current session's agent changes, or all repository changes if the session made none; apply confirmed fixes. |
+| `--base <ref>` | Context only when session changes exist; otherwise review changes from the merge-base of ref/HEAD plus the working tree. |
 | `--focus "text"` | Additional topic; quote values containing spaces or starting with flags. |
 | `--help` | Help without waking the agent. |
 

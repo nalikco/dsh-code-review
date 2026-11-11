@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.4.1
+
+- Review repository changes when a session has made no changes, including the `--base` comparison when supplied. Do not expand scope when session history is inconclusive.
+
 ## 1.4.0
 
 - Limit review to changes attributable to the current session, including when `--base` is supplied; report attribution gaps instead of reviewing unrelated changes.
